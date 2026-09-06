@@ -1,7 +1,9 @@
-workspace/*
-
 !.keep
-!CMakeLists.txt
-!*.sh
-
 *.swp
+/crash-*
+/leak-*
+/oom-*
+/timeout-*
+CMakeUserPresets.json
+out/
+workspace/*

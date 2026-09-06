@@ -1,25 +1,24 @@
-// © 2020 Joseph Cameron - All Rights Reserved
+// © Joseph Cameron - All Rights Reserved
 
 #include <jfc/http/curl_get.h>
 
+#include <utility>
+
 using namespace jfc;
 
-http::curl_get::curl_get(std::weak_ptr<http::curl_context> pContext,
+http::curl_get::curl_get(
+    std::weak_ptr<http::curl_context> pContext,
     const std::string &aURL,
-    const std::string &aUserAgent,
-    const size_t aTimeoutMiliseconds,
-    const std::vector<std::string> &aHeaders,
-    std::unique_ptr<http::reponse_handler> && aHandler)
-: http::curl_request::curl_request(pContext, 
-    aURL, 
-    aUserAgent, 
-    aTimeoutMiliseconds,
-    aHeaders, 
-    std::move(aHandler))
+    const http::request_config &aConfig,
+    http::response_handler_ptr_type &&aHandler
+) : http::curl_request(pContext, aURL, aConfig, std::move(aHandler))
 {}
 
-bool http::curl_get::try_enqueue()
-{
-    return curl_request::try_enqueue();
+bool http::curl_get::try_submit() {
+    return curl_request::try_submit();
+}
+
+void http::curl_get::cancel() {
+    curl_request::cancel();
 }
 

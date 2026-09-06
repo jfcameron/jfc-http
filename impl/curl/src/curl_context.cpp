@@ -1,94 +1,113 @@
-// © 2020 Joseph Cameron - All Rights Reserved
+// © Joseph Cameron - All Rights Reserved
 
 #include <jfc/http/curl_context.h>
 #include <jfc/http/curl_get.h>
 #include <jfc/http/curl_post.h>
 #include <jfc/http/curl_request.h>
+#include <jfc/http/curl_share.h>
 
-#include <iostream>
+#include <cstddef>
+#include <mutex>
+#include <thread>
+#include <utility>
+#include <vector>
 
 using namespace jfc;
 
-static size_t c_context_instance_counter(0);
-
-http::curl_context::curl_context()
-{
-    if (!c_context_instance_counter++)
-        curl_global_init(CURL_GLOBAL_ALL);
+namespace {
+    std::mutex g_GlobalInitMutex;
+    std::size_t g_ContextInstanceCount = 0;
 }
 
-http::curl_context::~curl_context()
-{
-    if (!--c_context_instance_counter)
+http::context_shared_ptr_type http::curl_context::make(http::policy aPolicy) {
+    return http::context_shared_ptr_type(new http::curl_context(std::move(aPolicy)));
+}
+
+http::curl_context::curl_context(http::policy aPolicy)
+: m_pShare(std::make_shared<http::curl_share>())
+, m_Policy([&aPolicy]()
     {
-        curl_global_cleanup();
+        if (!aPolicy.submit) aPolicy.submit = http::make_serial_task_submitter();
 
-        c_context_instance_counter = 0;
-    }
-}
-
-size_t http::curl_context::enqueued_request_count()
+        return std::move(aPolicy);
+    }())
 {
-    return m_unhandled_requests.size();
+    const std::lock_guard<std::mutex> lock(g_GlobalInitMutex);
+
+    if (g_ContextInstanceCount++ == 0) curl_global_init(CURL_GLOBAL_ALL);
 }
 
-http::context::request_shared_ptr http::curl_context::make_get(const std::string &aURL,
-    const std::string &aUserAgent,
-    const size_t aTimeoutMiliseconds,
-    const std::vector<std::string> &aHeaders,
-    std::unique_ptr<http::reponse_handler> && aHandler)
-{
-    std::shared_ptr<http::curl_get> p(new jfc::http::curl_get(weak_from_this(), 
-        aURL, aUserAgent, aTimeoutMiliseconds, aHeaders, std::move(aHandler)));
+http::curl_context::~curl_context() {
+    while (m_InFlightTaskCount.load(std::memory_order_acquire) > 0) std::this_thread::yield();
 
-    return std::static_pointer_cast<jfc::http::context::request_shared_ptr::element_type>(p);
+    const std::lock_guard<std::mutex> lock(g_GlobalInitMutex);
+
+    if (--g_ContextInstanceCount == 0) curl_global_cleanup();
 }
 
-std::shared_ptr<http::post> http::curl_context::make_post(const std::string &aURL,
-    const std::string &aUserAgent,
-    const size_t aTimeoutMiliseconds,
-    const std::vector<std::string> &aHeaders,
+void http::curl_context::cancel_all() {
+    for (const auto &pRequest : m_UnhandledRequests) pRequest->cancel();
+}
+
+std::shared_ptr<http::curl_share> http::curl_context::share() const {
+    return m_pShare;
+}
+
+std::size_t http::curl_context::outstanding_request_count() const {
+    return m_UnhandledRequests.size();
+}
+
+http::request_shared_ptr_type http::curl_context::make_get(const std::string &aURL,
+    const http::request_config &aConfig,
+    http::response_handler_ptr_type &&aHandler
+) {
+    return std::static_pointer_cast<http::request>(
+        std::make_shared<http::curl_get>(weak_from_this(), aURL, aConfig, std::move(aHandler)));
+}
+
+http::post_shared_ptr_type http::curl_context::make_post(const std::string &aURL,
     const std::string &aPostData,
-    std::unique_ptr<http::reponse_handler> && aHandler)
-{
-    std::shared_ptr<http::curl_post> p(new jfc::http::curl_post(weak_from_this(),
-        aURL, aUserAgent, aTimeoutMiliseconds, aHeaders, aPostData, std::move(aHandler)));
-
-    return std::static_pointer_cast<http::post>(p);
+    const http::request_config &aConfig,
+    http::response_handler_ptr_type &&aHandler
+) {
+    return std::static_pointer_cast<http::post>(std::make_shared<http::curl_post>(
+        weak_from_this(), aURL, aPostData, aConfig, std::move(aHandler)));
 }
 
-bool http::curl_context::main_try_handle_completed_request()
-{
-    for (size_t i(0); i < m_unhandled_requests.size(); ++i)
-    {
-        if (m_unhandled_requests[i]->main_try_run_handlers())
-        {
-            m_unhandled_requests.erase(m_unhandled_requests.begin() + i);
+bool http::curl_context::main_try_handle_completed_request() {
+    for (std::size_t i(0); i < m_UnhandledRequests.size(); ++i) {
+        if (!m_UnhandledRequests[i]->main_try_claim()) continue;
 
-            return true;
-        }
-    }
-
-    return false;
-}
-
-bool http::curl_context::worker_try_perform_enqueued_request()
-{
-    if (curl_context::worker_task_type task; m_worker_task_queue->try_dequeue(task)) 
-    {
-        task();
-
+        const auto pRequest = m_UnhandledRequests[i];
+        m_UnhandledRequests.erase(m_UnhandledRequests.begin() + i);
+        pRequest->main_run_handlers();
         return true;
     }
 
     return false;
 }
 
-void http::curl_context::enqueue(std::shared_ptr<http::curl_request> aRequest)
-{
-    m_unhandled_requests.push_back(aRequest);
+void http::curl_context::submit(std::shared_ptr<http::curl_request> aRequest) {
+    m_UnhandledRequests.push_back(aRequest);
 
-    m_worker_task_queue->enqueue(
-        std::bind(&http::curl_request::worker_fetch_task, aRequest.get()));
+    m_InFlightTaskCount.fetch_add(1, std::memory_order_release);
+
+    const auto pGuard = std::shared_ptr<void>(nullptr, [this](void *) {
+        m_InFlightTaskCount.fetch_sub(1, std::memory_order_release);
+    });
+
+    std::vector<http::task_type> tasks;
+
+    tasks.emplace_back([pRequest = std::move(aRequest), pGuard]() {
+        pRequest->worker_fetch_task();
+    });
+
+    try {
+        m_Policy.submit(std::move(tasks));
+    }
+    catch (...) {
+        m_UnhandledRequests.pop_back();
+        throw;
+    }
 }
 

@@ -1,90 +1,64 @@
-// © 2020 Joseph Cameron - All Rights Reserved
+// © Joseph Cameron - All Rights Reserved
 
 #ifndef JFC_HTTP_CONTEXT_H
 #define JFC_HTTP_CONTEXT_H
 
-#include <memory>
-#include <string>
-#include <vector>
-
-#include <jfc/http/request.h>
 #include <jfc/http/post.h>
+#include <jfc/http/request.h>
 #include <jfc/http/response_handler.h>
+#include <jfc/http/types.h>
+
+#include <cstddef>
+#include <string>
 
 namespace jfc::http
 {
-    /// \brief library entry point.
-    class context
-    {
+    /// \brief library entry point: makes requests and moves them between main and the workers
+    class context {
     public:
-        using context_shared_ptr = std::shared_ptr<http::context>;
-        using request_shared_ptr = std::shared_ptr<http::request>;
+        /// \brief create a GET whose response the worker processes before returning to main
+        [[nodiscard]] virtual request_shared_ptr_type make_get(const std::string &aURL,
+            const request_config &aConfig,
+            response_handler_ptr_type &&aHandler) = 0;
 
-        /// \brief used to tell context factory what implementation to use
-        enum class implementation
-        {
-            curl, /// !< use libcurl impl
-            null /// !< testing, & when porting dependent code somewhere unsupported
-            //TODO: wasm_browser_apis /// !< use browser apis if compiled to wasm
-        };
+        /// \brief create a GET whose raw response is returned directly to main
+        [[nodiscard]] request_shared_ptr_type make_get(const std::string &aURL,
+            const request_config &aConfig,
+            response_functor_type aOnSuccess,
+            failure_functor_type aOnFailure);
 
-        /// \brief create a context
-        [[nodiscard]] static context_shared_ptr make(const implementation &);
-        
-        /// \brief create a GET request
-        /// worker processes response before returning to main
-        [[nodiscard]] virtual request_shared_ptr make_get(const std::string &aURL,
-            const std::string &aUserAgent,
-            const size_t aTimeoutMiliseconds,
-            const std::vector<std::string> &aHeaders,
-            std::unique_ptr<http::reponse_handler> &&) = 0;
-
-        /// \brief create a GET request
-        /// worker returns the raw response directly to main
-        [[nodiscard]] request_shared_ptr make_get(const std::string& aURL,
-            const std::string& aUserAgent,
-            const size_t aTimeoutMiliseconds,
-            const std::vector<std::string>& aHeaders,
-            std::function<void(std::vector<char>)> aOnSuccess,
-            std::function<void(const http::request::error)> aOnFailure);
-        
-        /// \brief create a POST request
-        /// worker processes response before returning to main
-        [[nodiscard]] virtual std::shared_ptr<http::post> make_post(const std::string &aURL,
-            const std::string &aUserAgent,
-            const size_t aTimeoutMiliseconds,
-            const std::vector<std::string> &aHeaders,
+        /// \brief create a POST whose response the worker processes before returning to main
+        [[nodiscard]] virtual post_shared_ptr_type make_post(const std::string &aURL,
             const std::string &aPostData,
-            std::unique_ptr<http::reponse_handler> &&) = 0;
+            const request_config &aConfig,
+            response_handler_ptr_type &&aHandler) = 0;
 
-        /// \brief create a POST request
-        /// worker processes response before returning to main
-        [[nodiscard]] std::shared_ptr<http::post> make_post(const std::string& aURL,
-            const std::string& aUserAgent,
-            const size_t aTimeoutMiliseconds,
-            const std::vector<std::string>& aHeaders,
-            const std::string& aPostData,
-            std::function<void(std::vector<char>)> aOnSuccess,
-            std::function<void(const http::request::error)> aOnFailure);
-        
-        /// \brief call handlers for completed requests 
+        /// \brief create a POST whose raw response is returned directly to main
+        [[nodiscard]] post_shared_ptr_type make_post(const std::string &aURL,
+            const std::string &aPostData,
+            const request_config &aConfig,
+            response_functor_type aOnSuccess,
+            failure_functor_type aOnFailure);
+
+        /// \brief run the handler for one completed request
         /// \warn must be called by the single "main" thread
-        /// \note returns true if a request was handled
+        /// \return true if a request was handled
         virtual bool main_try_handle_completed_request() = 0;
 
-        /// \brief performs enqueued fetches.
-        /// \note threadsafe.
-        /// \warn must be called by at least one thread.
-        /// \warn "main" can participate but this will cause blocking on main
-        /// \note returns true if a fetch was performed
-        virtual bool worker_try_perform_enqueued_request() = 0;
-        
-        /// \brief returns the number of requests currently enqueued
-        virtual size_t enqueued_request_count() = 0;
+        /// \brief ask for every outstanding request to be abandoned
+        ///
+        /// Main-thread only, unlike `request::cancel`: this walks the outstanding list, which
+        /// belongs to main. Requests already finished are unaffected.
+        virtual void cancel_all() = 0;
+
+        /// \brief the number of requests submitted and not yet handled by main
+        ///
+        /// Counts requests whose handlers main still owes, which includes those a worker has
+        /// already finished fetching. It is not a count of what is running.
+        [[nodiscard]] virtual std::size_t outstanding_request_count() const = 0;
 
         virtual ~context() = default;
     };
 }
 
 #endif
-

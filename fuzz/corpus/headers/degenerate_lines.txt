@@ -1,0 +1,5 @@
+NoColonHere
+:
+: novalue
+name:
+   

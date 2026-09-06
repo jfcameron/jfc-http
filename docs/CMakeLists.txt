@@ -1,6 +1,4 @@
-# © 2020 Joseph Cameron - All Rights Reserved
-
-cmake_minimum_required(VERSION 3.9 FATAL_ERROR)
+# © Joseph Cameron - All Rights Reserved
 
 jfc_generate_documentation_doxygen(
     PROJECT_LOGO ${CMAKE_CURRENT_LIST_DIR}/icon.png
@@ -10,3 +8,4 @@ jfc_generate_documentation_doxygen(
     INCLUDE_DIRECTORIES
         ../include/
 )
+

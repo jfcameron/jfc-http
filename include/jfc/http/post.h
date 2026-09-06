@@ -4,24 +4,19 @@
 #define JFC_HTTP_POST_H
 
 #include <jfc/http/request.h>
+#include <jfc/http/types.h>
 
-#include <functional>
 #include <string>
-#include <vector>
 
-namespace jfc::http
-{
-    /// \brief HTTP POST
-    class post : public request
-    {
+namespace jfc::http {
+    class post : public request {
     public:
-        /// \brief update the post data
-        /// \note fails if called while the POST is enqueued
-        virtual bool try_update_postdata(const std::string &aPostData) = 0;
+        /// \brief replace the body sent by the next send
+        /// \return false if called while the post is enqueued, in which case the body is unchanged
+        [[nodiscard]] virtual bool try_update_postdata(const std::string &aPostData) = 0;
 
-        virtual ~post() = default;
+        virtual ~post() override = default;
     };
 }
 
 #endif
-

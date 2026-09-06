@@ -1,6 +1,4 @@
-# © 2020 Joseph Cameron - All Rights Reserved
-
-cmake_minimum_required(VERSION 3.9 FATAL_ERROR)
+# © Joseph Cameron - All Rights Reserved
 
 if(CMAKE_SYSTEM_NAME MATCHES "Linux")
     find_package(Threads REQUIRED)
@@ -10,7 +8,7 @@ jfc_project(executable
     NAME "jfchttp-demo"
     VERSION 1.0
     DESCRIPTION "jfc-http demonstration"
-    C++_STANDARD 17
+    C++_STANDARD 20
     C_STANDARD 90
 
     SOURCE_LIST
@@ -22,9 +20,11 @@ jfc_project(executable
     LIBRARIES
         "${jfchttp_LIBRARIES}"
         ${CMAKE_THREAD_LIBS_INIT}
-		${CURL_LIBRARIES}
 
     DEPENDENCIES
         "jfchttp"
 )
+
+set_property(TARGET jfchttp-demo PROPERTY CXX_EXTENSIONS OFF)
+set_property(TARGET jfchttp-demo PROPERTY CXX_STANDARD_REQUIRED ON)
 

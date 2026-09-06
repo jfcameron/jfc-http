@@ -4,67 +4,68 @@
 #define JFC_HTTP_NULL_CONTEXT_H
 
 #include <jfc/http/context.h>
+#include <jfc/http/policy.h>
+#include <jfc/http/post.h>
+#include <jfc/http/request.h>
+#include <jfc/http/types.h>
 
-namespace jfc::http
-{
-    class null_get : public http::request
-    {
+#include <cstddef>
+#include <string>
+
+namespace jfc::http {
+    class null_get final : public http::request {
     public:
-        virtual bool try_enqueue() override { return false; }
+        [[nodiscard]] bool try_submit() override;
+
+        void cancel() override;
 
         null_get() = default;
+
+        ~null_get() override = default;
     };
 
-    class null_post : public http::post
-    {
+    class null_post final : public http::post {
     public:
-        virtual bool try_enqueue() override { return false; }
-        
-        virtual bool try_update_postdata(const std::string &aPostData) override 
-        { 
-            return false; 
-        }
-        
+        [[nodiscard]] bool try_submit() override;
+
+        void cancel() override;
+
+        [[nodiscard]] bool try_update_postdata(const std::string &aPostData) override;
+
         null_post() = default;
+
+        ~null_post() override = default;
     };
 
-    class null_context final : public http::context
-    {
+    /// \brief does nothing; for tests, and for porting work
+    class null_context final : public http::context {
     public:
-    /// \name external interface
-    ///@{
-    //
-        virtual request_shared_ptr make_get(const std::string &aURL,
-            const std::string &aUserAgent,
-            const size_t aTimeoutMiliseconds,
-            const std::vector<std::string> &aHeaders,
-            std::unique_ptr<http::reponse_handler> &&) override
-        {
-            return request_shared_ptr(new null_get());
-        }
+        /// \brief create a context that performs no transfers
+        [[nodiscard]] static context_shared_ptr_type make(http::policy aPolicy = {});
 
-        virtual std::shared_ptr<http::post> make_post(const std::string &aURL,
-            const std::string &aUserAgent,
-            const size_t aTimeoutMiliseconds,
-            const std::vector<std::string> &aHeaders,
+        using http::context::make_get;
+        using http::context::make_post;
+
+        [[nodiscard]] request_shared_ptr_type make_get(const std::string &aURL,
+            const request_config &aConfig,
+            response_handler_ptr_type &&aHandler) override;
+
+        [[nodiscard]] post_shared_ptr_type make_post(const std::string &aURL,
             const std::string &aPostData,
-            std::unique_ptr<http::reponse_handler> &&) override
-        {
-            return std::shared_ptr<http::post>(new null_post());
-        }
+            const request_config &aConfig,
+            response_handler_ptr_type &&aHandler) override;
 
-        virtual bool main_try_handle_completed_request() override { return false; }
+        bool main_try_handle_completed_request() override;
 
-        virtual bool worker_try_perform_enqueued_request() override { return false; }
-        
-        virtual size_t enqueued_request_count() override { return 0; }
-    ///@}
+        void cancel_all() override;
 
-        null_context() = default;
+        [[nodiscard]] std::size_t outstanding_request_count() const override;
 
-        ~null_context() = default;
+        ~null_context() override = default;
+
+    private:
+        explicit null_context(http::policy aPolicy = {});
     };
 }
 
 #endif
-
