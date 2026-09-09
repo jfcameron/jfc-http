@@ -2,6 +2,8 @@
 
 cmake_minimum_required(VERSION 3.21 FATAL_ERROR)
 
+set(JFCHTTP_VERSION 0.75)
+
 project(jfchttp
     VERSION ${JFCHTTP_VERSION}
     DESCRIPTION "concurrent, object oriented http lib")
@@ -11,8 +13,6 @@ include("${CMAKE_CURRENT_SOURCE_DIR}/cmake/jfc-cmake/jfclib.cmake")
 option(JFC_BUILD_DEMO "Build the demo" ON)
 option(JFC_BUILD_DOCS "Build documentation" OFF)
 option(JFC_BUILD_TESTS "Build unit tests" OFF)
-
-set(JFCHTTP_VERSION 0.75)
 
 add_subdirectory(extern)
 

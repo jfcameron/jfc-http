@@ -41,7 +41,7 @@ namespace jfc::http
             failure_functor_type aOnFailure);
 
         /// \brief run the handler for one completed request
-        /// \warn must be called by the single "main" thread
+        /// \warning must be called by the single "main" thread
         /// \return true if a request was handled
         virtual bool main_try_handle_completed_request() = 0;
 
