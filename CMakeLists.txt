@@ -2,7 +2,9 @@
 
 cmake_minimum_required(VERSION 3.21 FATAL_ERROR)
 
-project(null)
+project(jfchttp
+    VERSION ${JFCHTTP_VERSION}
+    DESCRIPTION "concurrent, object oriented http lib")
 
 include("${CMAKE_CURRENT_SOURCE_DIR}/cmake/jfc-cmake/jfclib.cmake")
 
@@ -37,23 +39,9 @@ else()
     endforeach()
 endif()
 
-jfc_project(library
-    NAME "jfchttp"
-    VERSION ${JFCHTTP_VERSION}
-    DESCRIPTION "concurrent, object oriented http lib"
-    C++_STANDARD 20
-    C_STANDARD 90
-    TYPE STATIC
+if (NOT TARGET jfchttp)
 
-    PUBLIC_INCLUDE_DIRECTORIES
-        ${CMAKE_CURRENT_SOURCE_DIR}/include
-        ${CMAKE_CURRENT_SOURCE_DIR}/impl/curl/include
-        ${CMAKE_CURRENT_SOURCE_DIR}/impl/null/include
-
-    PRIVATE_INCLUDE_DIRECTORIES
-        ${CURL_INCLUDE_DIR}
-
-    SOURCE_LIST
+    add_library(jfchttp STATIC
         ${CMAKE_CURRENT_SOURCE_DIR}/src/buffering_response_handler.cpp
         ${CMAKE_CURRENT_SOURCE_DIR}/src/context.cpp
         ${CMAKE_CURRENT_SOURCE_DIR}/src/exception.cpp
@@ -65,14 +53,33 @@ jfc_project(library
         ${CMAKE_CURRENT_SOURCE_DIR}/impl/curl/src/curl_post.cpp
         ${CMAKE_CURRENT_SOURCE_DIR}/impl/curl/src/curl_request.cpp
         ${CMAKE_CURRENT_SOURCE_DIR}/impl/curl/src/curl_share.cpp
-        ${CMAKE_CURRENT_SOURCE_DIR}/impl/null/src/null_context.cpp
+        ${CMAKE_CURRENT_SOURCE_DIR}/impl/null/src/null_context.cpp)
 
-    LIBRARIES
-        ${CURL_LIBRARIES}
+    add_library(jfc::http ALIAS jfchttp)
 
-    DEPENDENCIES
-        ${CURL_LIBRARY_NAME}
-)
+    set_target_properties(jfchttp PROPERTIES EXPORT_NAME http)
+
+    set_target_properties(jfchttp PROPERTIES PREFIX "lib")
+
+    jfc_generate_cmake_header()
+
+    target_include_directories(jfchttp
+        PUBLIC
+            "$<BUILD_INTERFACE:${CMAKE_CURRENT_SOURCE_DIR}/include>"
+            "$<BUILD_INTERFACE:${CMAKE_CURRENT_SOURCE_DIR}/impl/curl/include>"
+            "$<BUILD_INTERFACE:${CMAKE_CURRENT_SOURCE_DIR}/impl/null/include>"
+            "$<INSTALL_INTERFACE:include>"
+        PRIVATE
+            "${PROJECT_BINARY_DIR}/generated_include/"
+        )
+
+    target_compile_features(jfchttp PUBLIC cxx_std_20)
+
+    target_link_libraries(jfchttp PUBLIC
+        ${JFC_CURL_TARGET}
+        ${JFC_CURL_SYSTEM_LIBRARIES})
+
+endif()
 
 file(READ "${CMAKE_CURRENT_SOURCE_DIR}/include/jfc/http/request.h" _request_header)
 
@@ -108,4 +115,3 @@ endif()
 if (JFC_BUILD_DOCS)
     add_subdirectory(docs)
 endif()
-

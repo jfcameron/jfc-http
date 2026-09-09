@@ -15,14 +15,13 @@ jfc_add_fuzz_tests(
         "${CMAKE_CURRENT_LIST_DIR}/corpus/headers"
 
     INCLUDE_DIRECTORIES
-        "${jfchttp_INCLUDE_DIRECTORIES}"
 
         "${CMAKE_CURRENT_LIST_DIR}/../impl/curl/include"
 
         "${CURL_INCLUDE_DIR}"
 
     LIBRARIES
-        "${jfchttp_LIBRARIES}"
+        jfchttp
         ${CMAKE_THREAD_LIBS_INIT}
 
     DEPENDENCIES

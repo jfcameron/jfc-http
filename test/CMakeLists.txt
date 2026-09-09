@@ -24,7 +24,6 @@ jfc_add_tests(
         "${CMAKE_CURRENT_LIST_DIR}/user_agent_test.cpp"
 
     INCLUDE_DIRECTORIES
-        "${jfchttp_INCLUDE_DIRECTORIES}"
 
         "${CMAKE_CURRENT_LIST_DIR}/../impl/curl/include"
         "${CMAKE_CURRENT_LIST_DIR}/../impl/null/include"
@@ -32,7 +31,7 @@ jfc_add_tests(
         "${CURL_INCLUDE_DIR}"
 
     LIBRARIES
-        "${jfchttp_LIBRARIES}"
+        jfchttp
         ${CMAKE_THREAD_LIBS_INIT}
 
     DEPENDENCIES
