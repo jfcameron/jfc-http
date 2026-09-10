@@ -61,7 +61,7 @@ if (NOT TARGET jfchttp)
 
     set_target_properties(jfchttp PROPERTIES PREFIX "lib")
 
-    jfc_generate_cmake_header()
+    jfc_generate_build_info()
 
     target_include_directories(jfchttp
         PUBLIC

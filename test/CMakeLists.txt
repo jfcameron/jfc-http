@@ -6,7 +6,6 @@ endif()
 
 jfc_add_tests(
     C++_STANDARD 20
-    C_STANDARD 90
 
     TEST_SOURCE_FILES
         "${CMAKE_CURRENT_LIST_DIR}/cancel_test.cpp"
@@ -38,6 +37,5 @@ jfc_add_tests(
         "jfchttp"
 )
 
-set_property(TARGET ${PROJECT_NAME} PROPERTY CXX_EXTENSIONS OFF)
-set_property(TARGET ${PROJECT_NAME} PROPERTY CXX_STANDARD_REQUIRED ON)
+set_property(TARGET ${JFC_TEST_TARGET} PROPERTY CXX_EXTENSIONS OFF)
 
