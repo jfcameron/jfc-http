@@ -5,7 +5,11 @@
 
 #include <jfc/http.h>
 
+#ifdef __EMSCRIPTEN__
+#include <jfc/http/fetch_context.h>
+#else
 #include <jfc/http/curl_context.h>
+#endif
 #include <jfc/http/null_context.h>
 
 #include <cstddef>
@@ -49,6 +53,7 @@ namespace jfc::http::test {
         return http::null_context::make();
     }
 
+#ifndef __EMSCRIPTEN__
     [[nodiscard]] inline http::context_shared_ptr_type curl_context()
     {
         return http::curl_context::make();
@@ -58,6 +63,7 @@ namespace jfc::http::test {
     {
         return http::curl_context::make({.submit = std::move(aSubmit)});
     }
+#endif
 
     [[nodiscard]] inline std::string to_string(const http::response_data_type &aData)
     {

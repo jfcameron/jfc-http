@@ -4,10 +4,14 @@ if(CMAKE_SYSTEM_NAME MATCHES "Linux")
     find_package(Threads REQUIRED)
 endif()
 
-jfc_add_tests(
-    C++_STANDARD 20
+if (EMSCRIPTEN)
+    set(_jfc_http_test_sources
+        "${CMAKE_CURRENT_LIST_DIR}/fetch_context_test.cpp"
+        "${CMAKE_CURRENT_LIST_DIR}/null_context_test.cpp")
 
-    TEST_SOURCE_FILES
+    set(_jfc_http_test_includes "${CMAKE_CURRENT_LIST_DIR}/../impl/fetch/include")
+else()
+    set(_jfc_http_test_sources
         "${CMAKE_CURRENT_LIST_DIR}/cancel_test.cpp"
         "${CMAKE_CURRENT_LIST_DIR}/context_test.cpp"
         "${CMAKE_CURRENT_LIST_DIR}/curl_request_test.cpp"
@@ -20,14 +24,23 @@ jfc_add_tests(
         "${CMAKE_CURRENT_LIST_DIR}/status_test.cpp"
         "${CMAKE_CURRENT_LIST_DIR}/streaming_test.cpp"
         "${CMAKE_CURRENT_LIST_DIR}/threading_test.cpp"
-        "${CMAKE_CURRENT_LIST_DIR}/user_agent_test.cpp"
+        "${CMAKE_CURRENT_LIST_DIR}/user_agent_test.cpp")
+
+    set(_jfc_http_test_includes
+        "${CMAKE_CURRENT_LIST_DIR}/../impl/curl/include"
+        "${CURL_INCLUDE_DIR}")
+endif()
+
+jfc_add_tests(
+    C++_STANDARD 20
+
+    TEST_SOURCE_FILES
+        ${_jfc_http_test_sources}
 
     INCLUDE_DIRECTORIES
 
-        "${CMAKE_CURRENT_LIST_DIR}/../impl/curl/include"
+        ${_jfc_http_test_includes}
         "${CMAKE_CURRENT_LIST_DIR}/../impl/null/include"
-
-        "${CURL_INCLUDE_DIR}"
 
     LIBRARIES
         jfchttp

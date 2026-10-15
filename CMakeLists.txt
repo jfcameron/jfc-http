@@ -40,6 +40,24 @@ else()
 endif()
 
 if (NOT TARGET jfchttp)
+    if (EMSCRIPTEN)
+        set(_jfc_http_implementation_sources
+            ${CMAKE_CURRENT_SOURCE_DIR}/impl/fetch/src/fetch_context.cpp
+            ${CMAKE_CURRENT_SOURCE_DIR}/impl/fetch/src/fetch_request.cpp)
+
+        set(_jfc_http_implementation_include "${CMAKE_CURRENT_SOURCE_DIR}/impl/fetch/include")
+        set(_jfc_http_implementation_private_include "${CMAKE_CURRENT_SOURCE_DIR}/impl/fetch/src/include")
+    else()
+        set(_jfc_http_implementation_sources
+            ${CMAKE_CURRENT_SOURCE_DIR}/impl/curl/src/curl_context.cpp
+            ${CMAKE_CURRENT_SOURCE_DIR}/impl/curl/src/curl_get.cpp
+            ${CMAKE_CURRENT_SOURCE_DIR}/impl/curl/src/curl_post.cpp
+            ${CMAKE_CURRENT_SOURCE_DIR}/impl/curl/src/curl_request.cpp
+            ${CMAKE_CURRENT_SOURCE_DIR}/impl/curl/src/curl_share.cpp)
+
+        set(_jfc_http_implementation_include "${CMAKE_CURRENT_SOURCE_DIR}/impl/curl/include")
+        set(_jfc_http_implementation_private_include "")
+    endif()
 
     add_library(jfchttp STATIC
         ${CMAKE_CURRENT_SOURCE_DIR}/src/buffering_response_handler.cpp
@@ -48,11 +66,7 @@ if (NOT TARGET jfchttp)
         ${CMAKE_CURRENT_SOURCE_DIR}/src/policy.cpp
         ${CMAKE_CURRENT_SOURCE_DIR}/src/request.cpp
         ${CMAKE_CURRENT_SOURCE_DIR}/src/types.cpp
-        ${CMAKE_CURRENT_SOURCE_DIR}/impl/curl/src/curl_context.cpp
-        ${CMAKE_CURRENT_SOURCE_DIR}/impl/curl/src/curl_get.cpp
-        ${CMAKE_CURRENT_SOURCE_DIR}/impl/curl/src/curl_post.cpp
-        ${CMAKE_CURRENT_SOURCE_DIR}/impl/curl/src/curl_request.cpp
-        ${CMAKE_CURRENT_SOURCE_DIR}/impl/curl/src/curl_share.cpp
+        ${_jfc_http_implementation_sources}
         ${CMAKE_CURRENT_SOURCE_DIR}/impl/null/src/null_context.cpp)
 
     add_library(jfc::http ALIAS jfchttp)
@@ -66,18 +80,23 @@ if (NOT TARGET jfchttp)
     target_include_directories(jfchttp
         PUBLIC
             "$<BUILD_INTERFACE:${CMAKE_CURRENT_SOURCE_DIR}/include>"
-            "$<BUILD_INTERFACE:${CMAKE_CURRENT_SOURCE_DIR}/impl/curl/include>"
+            "$<BUILD_INTERFACE:${_jfc_http_implementation_include}>"
             "$<BUILD_INTERFACE:${CMAKE_CURRENT_SOURCE_DIR}/impl/null/include>"
             "$<INSTALL_INTERFACE:include>"
         PRIVATE
             "${PROJECT_BINARY_DIR}/generated_include/"
+            ${_jfc_http_implementation_private_include}
         )
 
     target_compile_features(jfchttp PUBLIC cxx_std_20)
 
-    target_link_libraries(jfchttp PUBLIC
-        ${JFC_CURL_TARGET}
-        ${JFC_CURL_SYSTEM_LIBRARIES})
+    if (EMSCRIPTEN)
+        target_link_options(jfchttp PUBLIC "-sFETCH")
+    else()
+        target_link_libraries(jfchttp PUBLIC
+            ${JFC_CURL_TARGET}
+            ${JFC_CURL_SYSTEM_LIBRARIES})
+    endif()
 
 endif()
 

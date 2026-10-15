@@ -1,5 +1,9 @@
 # © Joseph Cameron - All Rights Reserved
 
+if (EMSCRIPTEN)
+    return()
+endif()
+
 if (CMAKE_SYSTEM_NAME MATCHES "Windows")
     add_subdirectory ("${CMAKE_CURRENT_SOURCE_DIR}/curl")
 
