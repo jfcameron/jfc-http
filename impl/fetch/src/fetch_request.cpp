@@ -150,7 +150,15 @@ void http::fetch_request::worker_finish(emscripten_fetch_t *const apFetch, const
 
     const auto pSelf = shared_from_this();
 
-    const auto task = [pSelf, apFetch, aSucceeded]() {
+    std::string headers;
+
+    if (!is_cancelled()) {
+        headers.resize(emscripten_fetch_get_response_headers_length(apFetch) + 1, '\0');
+
+        emscripten_fetch_get_response_headers(apFetch, headers.data(), headers.size());
+    }
+
+    const auto task = [pSelf, apFetch, aSucceeded, headers = std::move(headers)]() {
         auto &self = *pSelf;
 
         if (self.is_cancelled()) {
@@ -164,12 +172,6 @@ void http::fetch_request::worker_finish(emscripten_fetch_t *const apFetch, const
 
         try {
             if (self.m_Status) self.m_ResponseHandler->worker_on_status(self.m_Status);
-
-            const auto headersLength = emscripten_fetch_get_response_headers_length(apFetch);
-
-            std::string headers(headersLength + 1, '\0');
-
-            emscripten_fetch_get_response_headers(apFetch, headers.data(), headers.size());
 
             std::string_view remaining(headers.c_str());
 
