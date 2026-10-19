@@ -27,7 +27,7 @@ namespace {
     }
 }
 
-http::fetch_request::fetch_request(std::weak_ptr<http::fetch_context> pContext, const std::string &aURL,
+http::fetch_request::fetch_request(std::weak_ptr<http::fetch_context> pContext, std::string_view aURL,
     const http::request_config &aConfig, http::response_handler_ptr_type &&aHandler)
 : m_pContext(std::move(pContext))
 , m_URL(aURL)
@@ -270,7 +270,7 @@ bool http::fetch_request::is_in_flight() const {
     return m_bInFlight;
 }
 
-http::fetch_get::fetch_get(std::weak_ptr<http::fetch_context> pContext, const std::string &aURL,
+http::fetch_get::fetch_get(std::weak_ptr<http::fetch_context> pContext, std::string_view aURL,
     const http::request_config &aConfig, http::response_handler_ptr_type &&aHandler)
 : http::fetch_request(std::move(pContext), aURL, aConfig, std::move(aHandler))
 {}
@@ -279,8 +279,8 @@ bool http::fetch_get::try_submit() { return fetch_request::try_submit(); }
 
 void http::fetch_get::cancel() { fetch_request::cancel(); }
 
-http::fetch_post::fetch_post(std::weak_ptr<http::fetch_context> pContext, const std::string &aURL,
-    const std::string &aPostData, const http::request_config &aConfig,
+http::fetch_post::fetch_post(std::weak_ptr<http::fetch_context> pContext, std::string_view aURL,
+    std::string_view aPostData, const http::request_config &aConfig,
     http::response_handler_ptr_type &&aHandler)
 : http::fetch_request(std::move(pContext), aURL, aConfig, std::move(aHandler))
 , m_PostData(aPostData)

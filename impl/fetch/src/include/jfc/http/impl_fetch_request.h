@@ -16,6 +16,7 @@
 #include <exception>
 #include <memory>
 #include <string>
+#include <string_view>
 #include <vector>
 
 namespace jfc::http {
@@ -37,7 +38,7 @@ namespace jfc::http {
         virtual ~fetch_request();
 
     protected:
-        fetch_request(std::weak_ptr<http::fetch_context> pContext, const std::string &aURL,
+        fetch_request(std::weak_ptr<http::fetch_context> pContext, std::string_view aURL,
             const http::request_config &aConfig, http::response_handler_ptr_type &&aHandler);
 
         virtual void configure(emscripten_fetch_attr_t &aAttributes);
@@ -88,7 +89,7 @@ namespace jfc::http {
 
         void cancel() override;
 
-        fetch_get(std::weak_ptr<http::fetch_context> pContext, const std::string &aURL,
+        fetch_get(std::weak_ptr<http::fetch_context> pContext, std::string_view aURL,
             const http::request_config &aConfig, http::response_handler_ptr_type &&aHandler);
 
         ~fetch_get() override = default;
@@ -102,8 +103,8 @@ namespace jfc::http {
 
         [[nodiscard]] bool try_update_postdata(const std::string &aPostData) override;
 
-        fetch_post(std::weak_ptr<http::fetch_context> pContext, const std::string &aURL,
-            const std::string &aPostData, const http::request_config &aConfig,
+        fetch_post(std::weak_ptr<http::fetch_context> pContext, std::string_view aURL,
+            std::string_view aPostData, const http::request_config &aConfig,
             http::response_handler_ptr_type &&aHandler);
 
         ~fetch_post() override = default;

@@ -3,12 +3,13 @@
 #include <jfc/http/curl_post.h>
 
 #include <utility>
+#include <string_view>
 
 using namespace jfc;
 
 http::curl_post::curl_post(std::weak_ptr<http::curl_context> pContext,
     const std::string &aURL,
-    const std::string &aPostData,
+    std::string_view aPostData,
     const http::request_config &aConfig,
     http::response_handler_ptr_type &&aHandler
 ) 

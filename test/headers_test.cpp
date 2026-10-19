@@ -13,6 +13,7 @@
 #include <memory>
 #include <optional>
 #include <string>
+#include <string_view>
 #include <utility>
 #include <vector>
 
@@ -52,7 +53,7 @@ namespace {
         void main_on_success() override {}
         void main_on_failure(const http::error) override {}
 
-        [[nodiscard]] std::optional<std::string> find(const std::string &aName) const
+        [[nodiscard]] std::optional<std::string> find(std::string_view aName) const
         {
             for (const auto &[name, value] : headers)
                 if (http::header_name_equals(name, aName)) return value;
