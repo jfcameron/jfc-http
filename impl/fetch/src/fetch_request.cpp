@@ -115,6 +115,8 @@ bool http::fetch_request::try_submit() {
 }
 
 void http::fetch_request::on_progress(emscripten_fetch_t *const apFetch) {
+    if (!_holder_of(apFetch)) return;
+
     const auto pRequest = *_holder_of(apFetch);
 
     if (pRequest->is_cancelled()) return;
@@ -134,12 +136,16 @@ void http::fetch_request::on_progress(emscripten_fetch_t *const apFetch) {
 }
 
 void http::fetch_request::on_success(emscripten_fetch_t *const apFetch) {
+    if (!_holder_of(apFetch)) return;
+
     const auto pRequest = *_holder_of(apFetch);
 
     pRequest->worker_finish(apFetch, true);
 }
 
 void http::fetch_request::on_error(emscripten_fetch_t *const apFetch) {
+    if (!_holder_of(apFetch)) return;
+
     const auto pRequest = *_holder_of(apFetch);
 
     pRequest->worker_finish(apFetch, false);
@@ -234,13 +240,14 @@ void http::fetch_request::main_abort_if_cancelled() {
 void http::fetch_request::close_fetch() {
     if (!m_pFetch) return;
 
-    delete _holder_of(m_pFetch);
+    auto *const pFetch = std::exchange(m_pFetch, nullptr);
+    auto *const pHolder = _holder_of(pFetch);
 
-    m_pFetch->userData = nullptr;
+    pFetch->userData = nullptr;
 
-    emscripten_fetch_close(m_pFetch);
+    emscripten_fetch_close(pFetch);
 
-    m_pFetch = nullptr;
+    delete pHolder;
 }
 
 void http::fetch_request::main_run_handlers() {
