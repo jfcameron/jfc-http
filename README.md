@@ -1,5 +1,5 @@
 # jfc-http
-Concurrent http client. Provides a null, libcurl and emscripten fetch implementations and selects which one at generation time based on cmake flags.
+Concurrent http client. Provides a null, libcurl and emscripten fetch implementation and selects which one at generation time based on cmake flags.
 
 ## Getting Started
 Install cmake 3.21 or greater, and a c++20 compatible compiler 
