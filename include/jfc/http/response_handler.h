@@ -1,4 +1,4 @@
-// © Joseph Cameron - All Rights Reserved
+// © Joseph Cameron - MIT License
 
 #ifndef JFC_HTTP_RESPONSE_HANDLER_H
 #define JFC_HTTP_RESPONSE_HANDLER_H
@@ -12,6 +12,9 @@ namespace jfc::http {
     /// \brief interface for user-defined request handler types
     class response_handler {
     public:
+        /// \brief called by the main thread each time the request is submitted, before any worker callback
+        virtual void main_on_submit() {}
+
         /// \brief called on the worker thread once the server's status line has been read
         ///
         /// \param aStatus the code from the status line -- 200, 206, 404, 503

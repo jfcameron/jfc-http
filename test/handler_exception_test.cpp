@@ -1,4 +1,4 @@
-// © Joseph Cameron - All Rights Reserved
+// © Joseph Cameron - MIT License
 
 #include <jfc/catch.hpp>
 #include <jfc/types.h>
@@ -207,7 +207,7 @@ TEST_CASE("a header carrying a line break is refused", "[jfc::http::request_conf
     {
         return pContext->make_get(REFUSED_URL,
             {.timeout_milliseconds = 1000, .headers = {aHeader}},
-            [](http::response_data_type) {}, [](http::error) {});
+            [](const http::response &) {}, [](const http::failure &) {});
     };
 
     SECTION("**a CRLF, which is how a second header is spliced in**")

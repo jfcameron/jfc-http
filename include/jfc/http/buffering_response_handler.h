@@ -1,4 +1,4 @@
-// © Joseph Cameron - All Rights Reserved
+// © Joseph Cameron - MIT License
 
 #ifndef JFC_HTTP_BUFFERING_RESPONSE_HANDLER_H
 #define JFC_HTTP_BUFFERING_RESPONSE_HANDLER_H
@@ -20,6 +20,8 @@ namespace jfc::http {
     /// \brief a handler that collects the whole response
     class buffering_response_handler : public http::response_handler { 
     public:
+        void main_on_submit() override;
+
         void worker_on_status(const response_status_type aStatus) override;
 
         [[nodiscard]] bool worker_on_data(response_chunk_type aChunk) override;

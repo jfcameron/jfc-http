@@ -1,4 +1,4 @@
-// © Joseph Cameron - All Rights Reserved
+// © Joseph Cameron - MIT License
 
 #include <jfc/catch.hpp>
 #include <jfc/types.h>
@@ -14,8 +14,8 @@ using namespace jfc;
 using namespace jfc::http::test;
 
 namespace {
-    void no_op_success(http::response_data_type) {}
-    void no_op_failure(http::error) {}
+    void no_op_success(const http::response &) {}
+    void no_op_failure(const http::failure &) {}
 }
 
 TEST_CASE("the factory returns the implementation it was asked for", "[jfc::http::context]") {

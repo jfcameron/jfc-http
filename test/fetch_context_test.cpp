@@ -1,4 +1,4 @@
-// © Joseph Cameron - All Rights Reserved
+// © Joseph Cameron - MIT License
 
 #include <jfc/catch.hpp>
 #include <jfc/types.h>
@@ -24,12 +24,12 @@ TEST_CASE("the fetch implementation builds and hands out requests", "[jfc::http:
 
     SECTION("**a get, and a post whose body may be changed before it is sent**") {
         const auto pGet = pContext->make_get(REFUSED_URL, config(),
-            [](http::response_data_type) {}, [](http::error) {});
+            [](const http::response &) {}, [](const http::failure &) {});
 
         REQUIRE(pGet);
 
         const auto pPost = pContext->make_post(REFUSED_URL, "a=1", config(),
-            [](http::response_data_type) {}, [](http::error) {});
+            [](const http::response &) {}, [](const http::failure &) {});
 
         REQUIRE(pPost);
         REQUIRE(pPost->try_update_postdata("a=2"));
@@ -41,12 +41,12 @@ TEST_CASE("the fetch implementation builds and hands out requests", "[jfc::http:
         bad.headers.push_back("X-Injected: a\r\nX-Second: b");
 
         REQUIRE_THROWS_AS(pContext->make_get(REFUSED_URL, bad,
-            [](http::response_data_type) {}, [](http::error) {}), http::exception);
+            [](const http::response &) {}, [](const http::failure &) {}), http::exception);
 
         bad.headers = {"not a header line"};
 
         REQUIRE_THROWS_AS(pContext->make_get(REFUSED_URL, bad,
-            [](http::response_data_type) {}, [](http::error) {}), http::exception);
+            [](const http::response &) {}, [](const http::failure &) {}), http::exception);
     }
 
     SECTION("**nothing is owed to main until something is submitted**") {
@@ -64,7 +64,7 @@ TEST_CASE("the fetch implementation builds and hands out requests", "[jfc::http:
             const auto pShortLived = http::fetch_context::make();
 
             pOrphan = pShortLived->make_get(REFUSED_URL, config(),
-                [](http::response_data_type) {}, [](http::error) {});
+                [](const http::response &) {}, [](const http::failure &) {});
         }
 
         REQUIRE_FALSE(pOrphan->try_submit());

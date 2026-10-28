@@ -1,4 +1,4 @@
-// © Joseph Cameron - All Rights Reserved
+// © Joseph Cameron - MIT License
 
 #ifndef JFC_HTTP_TEST_SERVER_H
 #define JFC_HTTP_TEST_SERVER_H
@@ -88,11 +88,11 @@ namespace jfc::http::test
             sockaddr_in address{};
 
             address.sin_family = AF_INET;
-            address.sin_addr.s_addr = ::htonl(INADDR_LOOPBACK);
+            address.sin_addr.s_addr = htonl(INADDR_LOOPBACK);
             address.sin_port = 0; 
 
             if (::bind(m_Listener, reinterpret_cast<sockaddr *>(&address), sizeof(address)) != 0
-                || ::listen(m_Listener, 1) != 0)
+                || ::listen(m_Listener, SOMAXCONN) != 0)
             {
                 close_socket(m_Listener);
 
@@ -105,7 +105,7 @@ namespace jfc::http::test
 
             ::getsockname(m_Listener, reinterpret_cast<sockaddr *>(&address), &length);
 
-            m_Port = ::ntohs(address.sin_port);
+            m_Port = ntohs(address.sin_port);
 
             m_Thread = std::thread([this]() { serve(); });
         }
@@ -247,6 +247,8 @@ namespace jfc::http::test
 
                     const auto &next = m_Responses[responseIndex++];
 
+                    ++m_Served;
+
                     if (!send_all(connection, encode_headers(next))) break;
 
                     for (std::size_t waited = 0;
@@ -257,8 +259,6 @@ namespace jfc::http::test
                     }
 
                     if (!next.body.empty() && !send_all(connection, next.body)) break;
-
-                    ++m_Served;
                 }
                 while (m_bKeepAlive && responseIndex < m_Responses.size() && !m_bStopping);
 

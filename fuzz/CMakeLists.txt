@@ -1,8 +1,4 @@
-# © Joseph Cameron - All Rights Reserved
-
-if(CMAKE_SYSTEM_NAME MATCHES "Linux")
-    find_package(Threads REQUIRED)
-endif()
+# © Joseph Cameron - MIT License
 
 jfc_add_fuzz_tests(
     C++_STANDARD 20
@@ -17,11 +13,10 @@ jfc_add_fuzz_tests(
 
         "${CMAKE_CURRENT_LIST_DIR}/../impl/curl/include"
 
-        "${CURL_INCLUDE_DIR}"
+        "${CMAKE_CURRENT_LIST_DIR}/../impl/curl/src/include"
 
     LIBRARIES
         jfchttp
-        ${CMAKE_THREAD_LIBS_INIT}
 
     DEPENDENCIES
         "jfchttp"

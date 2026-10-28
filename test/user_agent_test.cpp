@@ -1,4 +1,4 @@
-// © Joseph Cameron - All Rights Reserved
+// © Joseph Cameron - MIT License
 
 #include <jfc/catch.hpp>
 #include <jfc/types.h>
@@ -46,8 +46,8 @@ namespace {
         const auto pContext = curl_context();
 
         const auto pGet = pContext->make_get(server.url(), aConfig,
-            [](const http::response_data_type &) {},
-            [](const http::error) {});
+            [](const http::response &) {},
+            [](const http::failure &) {});
 
         REQUIRE(pGet->try_submit());
         REQUIRE(pContext->main_try_handle_completed_request());

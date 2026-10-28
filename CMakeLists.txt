@@ -1,6 +1,10 @@
-# © Joseph Cameron - All Rights Reserved
+# © Joseph Cameron - MIT License
 
 cmake_minimum_required(VERSION 3.21 FATAL_ERROR)
+
+if (TARGET jfc::http)
+    return()
+endif()
 
 set(JFCHTTP_VERSION 0.75)
 
@@ -10,11 +14,27 @@ project(jfchttp
 
 include("${CMAKE_CURRENT_SOURCE_DIR}/cmake/jfc-cmake/jfclib.cmake")
 
-option(JFC_BUILD_DEMO "Build the demo" ON)
-option(JFC_BUILD_DOCS "Build documentation" OFF)
-option(JFC_BUILD_TESTS "Build unit tests" OFF)
+option(JFCHTTP_BUILD_TESTS "Build unit tests" ${PROJECT_IS_TOP_LEVEL})
+option(JFCHTTP_BUILD_DEMO "Build the demo" OFF)
+option(JFCHTTP_BUILD_DOCS "Build documentation" OFF)
+
+if (WIN32 OR ANDROID)
+    set(_jfc_http_vendor_curl_by_default ON)
+else()
+    set(_jfc_http_vendor_curl_by_default OFF)
+endif()
+
+option(JFCHTTP_VENDORED_CURL "Build extern/curl rather than finding the system's" ${_jfc_http_vendor_curl_by_default})
+
+include(GNUInstallDirs)
+
+find_package(Threads REQUIRED)
 
 add_subdirectory(extern)
+
+if (NOT EMSCRIPTEN AND NOT TARGET CURL::libcurl)
+    find_package(CURL REQUIRED)
+endif()
 
 set(CMAKE_CXX_EXTENSIONS OFF)
 set(CMAKE_CXX_STANDARD_REQUIRED ON)
@@ -39,65 +59,59 @@ else()
     endforeach()
 endif()
 
-if (NOT TARGET jfchttp)
-    if (EMSCRIPTEN)
-        set(_jfc_http_implementation_sources
-            ${CMAKE_CURRENT_SOURCE_DIR}/impl/fetch/src/fetch_context.cpp
-            ${CMAKE_CURRENT_SOURCE_DIR}/impl/fetch/src/fetch_request.cpp)
+if (EMSCRIPTEN)
+    set(_jfc_http_implementation_sources
+        ${CMAKE_CURRENT_SOURCE_DIR}/impl/fetch/src/fetch_context.cpp
+        ${CMAKE_CURRENT_SOURCE_DIR}/impl/fetch/src/fetch_request.cpp)
 
-        set(_jfc_http_implementation_include "${CMAKE_CURRENT_SOURCE_DIR}/impl/fetch/include")
-        set(_jfc_http_implementation_private_include "${CMAKE_CURRENT_SOURCE_DIR}/impl/fetch/src/include")
-    else()
-        set(_jfc_http_implementation_sources
-            ${CMAKE_CURRENT_SOURCE_DIR}/impl/curl/src/curl_context.cpp
-            ${CMAKE_CURRENT_SOURCE_DIR}/impl/curl/src/curl_get.cpp
-            ${CMAKE_CURRENT_SOURCE_DIR}/impl/curl/src/curl_post.cpp
-            ${CMAKE_CURRENT_SOURCE_DIR}/impl/curl/src/curl_request.cpp
-            ${CMAKE_CURRENT_SOURCE_DIR}/impl/curl/src/curl_share.cpp)
+    set(_jfc_http_implementation_include "${CMAKE_CURRENT_SOURCE_DIR}/impl/fetch/include")
+    set(_jfc_http_implementation_private_include "${CMAKE_CURRENT_SOURCE_DIR}/impl/fetch/src/include")
+else()
+    set(_jfc_http_implementation_sources
+        ${CMAKE_CURRENT_SOURCE_DIR}/impl/curl/src/curl_context.cpp
+        ${CMAKE_CURRENT_SOURCE_DIR}/impl/curl/src/curl_get.cpp
+        ${CMAKE_CURRENT_SOURCE_DIR}/impl/curl/src/curl_post.cpp
+        ${CMAKE_CURRENT_SOURCE_DIR}/impl/curl/src/curl_request.cpp
+        ${CMAKE_CURRENT_SOURCE_DIR}/impl/curl/src/curl_share.cpp)
 
-        set(_jfc_http_implementation_include "${CMAKE_CURRENT_SOURCE_DIR}/impl/curl/include")
-        set(_jfc_http_implementation_private_include "")
-    endif()
+    set(_jfc_http_implementation_include "${CMAKE_CURRENT_SOURCE_DIR}/impl/curl/include")
+    set(_jfc_http_implementation_private_include "${CMAKE_CURRENT_SOURCE_DIR}/impl/curl/src/include")
+endif()
 
-    add_library(jfchttp STATIC
-        ${CMAKE_CURRENT_SOURCE_DIR}/src/buffering_response_handler.cpp
-        ${CMAKE_CURRENT_SOURCE_DIR}/src/context.cpp
-        ${CMAKE_CURRENT_SOURCE_DIR}/src/exception.cpp
-        ${CMAKE_CURRENT_SOURCE_DIR}/src/policy.cpp
-        ${CMAKE_CURRENT_SOURCE_DIR}/src/request.cpp
-        ${CMAKE_CURRENT_SOURCE_DIR}/src/types.cpp
-        ${_jfc_http_implementation_sources}
-        ${CMAKE_CURRENT_SOURCE_DIR}/impl/null/src/null_context.cpp)
+add_library(jfchttp STATIC
+    ${CMAKE_CURRENT_SOURCE_DIR}/src/buffering_response_handler.cpp
+    ${CMAKE_CURRENT_SOURCE_DIR}/src/context.cpp
+    ${CMAKE_CURRENT_SOURCE_DIR}/src/exception.cpp
+    ${CMAKE_CURRENT_SOURCE_DIR}/src/policy.cpp
+    ${CMAKE_CURRENT_SOURCE_DIR}/src/request.cpp
+    ${CMAKE_CURRENT_SOURCE_DIR}/src/types.cpp
+    ${_jfc_http_implementation_sources}
+    ${CMAKE_CURRENT_SOURCE_DIR}/impl/null/src/null_context.cpp)
 
-    add_library(jfc::http ALIAS jfchttp)
+add_library(jfc::http ALIAS jfchttp)
 
-    set_target_properties(jfchttp PROPERTIES EXPORT_NAME http)
+set_target_properties(jfchttp PROPERTIES EXPORT_NAME http)
 
-    set_target_properties(jfchttp PROPERTIES PREFIX "lib")
+set_target_properties(jfchttp PROPERTIES PREFIX "lib")
 
-    jfc_generate_build_info()
+target_include_directories(jfchttp
+    PUBLIC
+        "$<BUILD_INTERFACE:${CMAKE_CURRENT_SOURCE_DIR}/include>"
+        "$<BUILD_INTERFACE:${_jfc_http_implementation_include}>"
+        "$<BUILD_INTERFACE:${CMAKE_CURRENT_SOURCE_DIR}/impl/null/include>"
+        "$<INSTALL_INTERFACE:${CMAKE_INSTALL_INCLUDEDIR}>"
+    PRIVATE
+        ${_jfc_http_implementation_private_include}
+    )
 
-    target_include_directories(jfchttp
-        PUBLIC
-            "$<BUILD_INTERFACE:${CMAKE_CURRENT_SOURCE_DIR}/include>"
-            "$<BUILD_INTERFACE:${_jfc_http_implementation_include}>"
-            "$<BUILD_INTERFACE:${CMAKE_CURRENT_SOURCE_DIR}/impl/null/include>"
-            "$<INSTALL_INTERFACE:include>"
-        PRIVATE
-            "${PROJECT_BINARY_DIR}/generated_include/"
-            ${_jfc_http_implementation_private_include}
-        )
+target_compile_features(jfchttp PUBLIC cxx_std_20)
 
-    target_compile_features(jfchttp PUBLIC cxx_std_20)
+target_link_libraries(jfchttp PUBLIC Threads::Threads)
 
-    if (EMSCRIPTEN)
-        target_link_options(jfchttp PUBLIC "-sFETCH")
-    else()
-        target_link_libraries(jfchttp PUBLIC
-            ${JFC_CURL_TARGET}
-            ${JFC_CURL_SYSTEM_LIBRARIES})
-    endif()
-
+if (EMSCRIPTEN)
+    target_link_options(jfchttp PUBLIC "-sFETCH")
+else()
+    target_link_libraries(jfchttp PUBLIC CURL::libcurl)
 endif()
 
 file(READ "${CMAKE_CURRENT_SOURCE_DIR}/include/jfc/http/request.h" _request_header)
@@ -119,11 +133,49 @@ endif()
 set_property(TARGET jfchttp PROPERTY CXX_EXTENSIONS OFF)
 set_property(TARGET jfchttp PROPERTY CXX_STANDARD_REQUIRED ON)
 
-if (JFC_BUILD_DEMO)
+include(CMakePackageConfigHelpers)
+
+install(TARGETS jfchttp
+    EXPORT jfc-http-targets
+    ARCHIVE DESTINATION "${CMAKE_INSTALL_LIBDIR}")
+
+install(DIRECTORY
+        "${CMAKE_CURRENT_SOURCE_DIR}/include/"
+        "${_jfc_http_implementation_include}/"
+        "${CMAKE_CURRENT_SOURCE_DIR}/impl/null/include/"
+    DESTINATION "${CMAKE_INSTALL_INCLUDEDIR}")
+
+install(EXPORT jfc-http-targets
+    FILE jfc-http-targets.cmake
+    NAMESPACE jfc::
+    DESTINATION "${CMAKE_INSTALL_LIBDIR}/cmake/jfc-http")
+
+write_basic_package_version_file(
+    "${CMAKE_CURRENT_BINARY_DIR}/jfc-http-config-version.cmake"
+    VERSION ${PROJECT_VERSION}
+    COMPATIBILITY SameMajorVersion)
+
+if (EMSCRIPTEN)
+    set(_jfc_http_dependencies "find_dependency(Threads)\n")
+else()
+    set(_jfc_http_dependencies "find_dependency(Threads)\nfind_dependency(CURL)\n")
+endif()
+
+file(WRITE "${CMAKE_CURRENT_BINARY_DIR}/jfc-http-config.cmake"
+"include(CMakeFindDependencyMacro)
+${_jfc_http_dependencies}include(\"\${CMAKE_CURRENT_LIST_DIR}/jfc-http-targets.cmake\")
+")
+
+install(FILES
+    "${CMAKE_CURRENT_BINARY_DIR}/jfc-http-config.cmake"
+    "${CMAKE_CURRENT_BINARY_DIR}/jfc-http-config-version.cmake"
+    DESTINATION "${CMAKE_INSTALL_LIBDIR}/cmake/jfc-http")
+
+if (JFCHTTP_BUILD_DEMO)
     add_subdirectory(demo)
 endif()
 
-if (JFC_BUILD_TESTS)
+if (JFCHTTP_BUILD_TESTS)
     add_subdirectory(test)
 endif()
 
@@ -131,6 +183,6 @@ if (JFC_BUILD_FUZZERS)
     add_subdirectory(fuzz)
 endif()
 
-if (JFC_BUILD_DOCS)
+if (JFCHTTP_BUILD_DOCS)
     add_subdirectory(docs)
 endif()

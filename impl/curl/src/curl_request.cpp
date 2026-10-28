@@ -1,4 +1,4 @@
-// © Joseph Cameron - All Rights Reserved
+// © Joseph Cameron - MIT License
 
 #include <jfc/http/curl_request.h>
 
@@ -218,8 +218,8 @@ http::curl_request::curl_request(std::weak_ptr<http::curl_context> pContext,
 , m_ResumeFromByte(aConfig.resume_from_byte)
 , m_bFailOnHTTPError(aConfig.fail_on_http_error)
 , m_ResponseHandler(std::move(aHandler)) {
-    if (const auto pContext = m_pContext.lock()) {
-        m_pShare = pContext->share();
+    if (const auto pLiveContext = m_pContext.lock()) {
+        m_pShare = pLiveContext->share();
         curl_easy_setopt(m_pHandle.get(), CURLOPT_SHARE, m_pShare->handle());
     }
 
@@ -321,6 +321,13 @@ void http::curl_request::worker_fetch_task() noexcept {
     m_bResponseLocked.clear();
 }
 
+void http::curl_request::worker_abandon() noexcept {
+    m_HandlerException = nullptr;
+    m_RequestError = http::error::cancelled;
+
+    m_bResponseLocked.clear();
+}
+
 void http::curl_request::perform_transfer() {
     m_ResponseSink = {
         .pHandler = m_ResponseHandler.get(),
@@ -374,6 +381,10 @@ bool http::curl_request::try_submit() {
     if (!pContext) return false;
 
     m_bCancelled.store(false, std::memory_order_release);
+
+    m_bResponseLocked.test_and_set();
+
+    m_ResponseHandler->main_on_submit();
 
     m_bInFlight = true;
 

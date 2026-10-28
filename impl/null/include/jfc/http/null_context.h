@@ -1,4 +1,4 @@
-// © Joseph Cameron - All Rights Reserved
+// © Joseph Cameron - MIT License
 
 #ifndef JFC_HTTP_NULL_CONTEXT_H
 #define JFC_HTTP_NULL_CONTEXT_H

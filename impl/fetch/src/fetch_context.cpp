@@ -1,4 +1,4 @@
-// © Joseph Cameron - All Rights Reserved
+// © Joseph Cameron - MIT License
 
 #include <jfc/http/fetch_context.h>
 
@@ -20,6 +20,10 @@ http::fetch_context::fetch_context(http::policy aPolicy)
         return std::move(aPolicy);
     }())
 {}
+
+http::fetch_context::~fetch_context() {
+    for (const auto &pRequest : m_UnhandledRequests) pRequest->main_abandon();
+}
 
 http::request_shared_ptr_type http::fetch_context::make_get(const std::string &aURL,
     const http::request_config &aConfig,

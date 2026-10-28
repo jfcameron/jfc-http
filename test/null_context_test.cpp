@@ -1,4 +1,4 @@
-// © Joseph Cameron - All Rights Reserved
+// © Joseph Cameron - MIT License
 
 #include <jfc/catch.hpp>
 #include <jfc/types.h>
@@ -21,7 +21,7 @@ TEST_CASE("the null implementation satisfies the whole contract", "[jfc::http::n
     SECTION("**it hands out a get, and declines to send it**")
     {
         const auto pGet = pContext->make_get(REFUSED_URL, config(),
-            [](http::response_data_type) {}, [](http::error) {});
+            [](const http::response &) {}, [](const http::failure &) {});
 
         REQUIRE(pGet);
         REQUIRE_FALSE(pGet->try_submit());
@@ -30,7 +30,7 @@ TEST_CASE("the null implementation satisfies the whole contract", "[jfc::http::n
     SECTION("**it hands out a post, and declines that too**")
     {
         const auto pPost = pContext->make_post(REFUSED_URL, "a=1", config(),
-            [](http::response_data_type) {}, [](http::error) {});
+            [](const http::response &) {}, [](const http::failure &) {});
 
         REQUIRE(pPost);
         REQUIRE_FALSE(pPost->try_submit());
@@ -50,7 +50,7 @@ TEST_CASE("the null implementation satisfies the whole contract", "[jfc::http::n
         const auto pNull = http::null_context::make({.submit = submitter.submitter()});
 
         const auto pGet = pNull->make_get(REFUSED_URL, config(),
-            [](http::response_data_type) {}, [](http::error) {});
+            [](const http::response &) {}, [](const http::failure &) {});
 
         REQUIRE_FALSE(pGet->try_submit());
         REQUIRE(submitter.pending() == 0);

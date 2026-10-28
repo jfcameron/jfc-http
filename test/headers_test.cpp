@@ -1,4 +1,4 @@
-// © Joseph Cameron - All Rights Reserved
+// © Joseph Cameron - MIT License
 
 #include <jfc/catch.hpp>
 #include <jfc/types.h>
@@ -260,8 +260,8 @@ TEST_CASE("a redirect chain is bounded", "[jfc::http::request_config]") {
     config.maximum_redirects = 2;
 
     const auto pGet = pContext->make_get(server.url(), config,
-        [](http::response_data_type) {},
-        [&](http::error aError) { reported = aError; });
+        [](const http::response &) {},
+        [&](const http::failure &aFailure) { reported = aFailure.error; });
 
     REQUIRE(pGet->try_submit());
     REQUIRE(pContext->main_try_handle_completed_request());
@@ -317,8 +317,8 @@ TEST_CASE("a resumed request carries the validator it was given", "[jfc::http::r
         config.if_range = "\"v1\"";
 
         const auto pGet = pContext->make_get(server.url(), config,
-            [](http::response_data_type) {},
-            [&](http::error aError) { reported = aError; });
+            [](const http::response &) {},
+            [&](const http::failure &aFailure) { reported = aFailure.error; });
 
         REQUIRE(pGet->try_submit());
         REQUIRE(pContext->main_try_handle_completed_request());
@@ -342,8 +342,8 @@ TEST_CASE("a resumed request carries the validator it was given", "[jfc::http::r
         config.if_range = "\"v1\"";
 
         const auto pGet = pContext->make_get(server.url(), config,
-            [](http::response_data_type) {},
-            [&](http::error aError) { reported = aError; });
+            [](const http::response &) {},
+            [&](const http::failure &aFailure) { reported = aFailure.error; });
 
         REQUIRE(pGet->try_submit());
         REQUIRE(pContext->main_try_handle_completed_request());

@@ -1,4 +1,4 @@
-// © Joseph Cameron - All Rights Reserved
+// © Joseph Cameron - MIT License
 
 #include <jfc/http/buffering_response_handler.h>
 #include <jfc/http/context.h>

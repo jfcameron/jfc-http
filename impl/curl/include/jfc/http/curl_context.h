@@ -1,4 +1,4 @@
-// © Joseph Cameron - All Rights Reserved
+// © Joseph Cameron - MIT License
 
 #ifndef JFC_HTTP_CURL_CONTEXT_H
 #define JFC_HTTP_CURL_CONTEXT_H
@@ -71,7 +71,7 @@ namespace jfc::http
 
         const http::policy m_Policy;
 
-        std::atomic<std::size_t> m_InFlightTaskCount{0};
+        std::shared_ptr<std::atomic<std::size_t>> m_pInFlightTaskCount = std::make_shared<std::atomic<std::size_t>>(0);
 
         std::vector<std::shared_ptr<http::curl_request>> m_UnhandledRequests;
     };

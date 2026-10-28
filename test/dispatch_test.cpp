@@ -1,9 +1,10 @@
-// © Joseph Cameron - All Rights Reserved
+// © Joseph Cameron - MIT License
 
 #include <jfc/catch.hpp>
 #include <jfc/types.h>
 
 #include "test_include.h"
+#include "test_server.h"
 
 #include <jfc/http/curl_context.h>
 
@@ -19,8 +20,8 @@ using namespace jfc;
 using namespace jfc::http::test;
 
 namespace {
-    void no_op_success(http::response_data_type) {}
-    void no_op_failure(http::error) {}
+    void no_op_success(const http::response &) {}
+    void no_op_failure(const http::failure &) {}
 }
 
 TEST_CASE("the serial submitter runs every task, in order, before returning",
@@ -46,7 +47,7 @@ TEST_CASE("a context with no policy performs work inline", "[jfc::http::policy]"
     http::error reported = http::error::none;
 
     const auto pGet = pContext->make_get(REFUSED_URL, config(),
-        no_op_success, [&](http::error aError) { reported = aError; });
+        no_op_success, [&](const http::failure &aFailure) { reported = aFailure.error; });
 
     REQUIRE(pGet->try_submit());
 
@@ -62,7 +63,7 @@ TEST_CASE("an empty submitter degrades to serial rather than crashing", "[jfc::h
     http::error reported = http::error::none;
 
     const auto pGet = pContext->make_get(REFUSED_URL, config(),
-        no_op_success, [&](http::error aError) { reported = aError; });
+        no_op_success, [&](const http::failure &aFailure) { reported = aFailure.error; });
 
     REQUIRE(pGet->try_submit());
     REQUIRE(pContext->main_try_handle_completed_request());
@@ -188,4 +189,77 @@ TEST_CASE("a throwing submitter does not strand the count", "[jfc::http::context
     }
 
     SUCCEED("the context was destroyed without waiting on a task that never ran");
+}
+
+TEST_CASE("a task the submitter drops finishes its request as cancelled", "[jfc::http::context]") {
+    const auto pContext = curl_context([](std::vector<http::task_type> &&) {});
+
+    std::size_t cancellations = 0;
+
+    const auto pGet = pContext->make_get(REFUSED_URL, config(), no_op_success,
+        [&](const http::failure &aFailure) { if (aFailure.error == http::error::cancelled) ++cancellations; });
+
+    for (std::size_t i = 0; i < 2; ++i)
+    {
+        REQUIRE(pGet->try_submit());
+        REQUIRE(pContext->main_try_handle_completed_request());
+    }
+
+    REQUIRE(cancellations == 2);
+    REQUIRE(pContext->outstanding_request_count() == 0);
+}
+
+TEST_CASE("a request whose submitter threw waits for its task when sent again", "[jfc::http::context]") {
+    bool refuse = true;
+
+    deferring_submitter deferred;
+
+    const auto pContext = curl_context([&](std::vector<http::task_type> &&aTasks) {
+        if (std::exchange(refuse, false)) throw http::exception("submitter refused");
+
+        deferred.submitter()(std::move(aTasks));
+    });
+
+    http::error reported = http::error::none;
+
+    const auto pGet = pContext->make_get(REFUSED_URL, config(), no_op_success,
+        [&](const http::failure &aFailure) { reported = aFailure.error; });
+
+    REQUIRE_THROWS_AS(pGet->try_submit(), http::exception);
+
+    REQUIRE(pGet->try_submit());
+    REQUIRE_FALSE(pContext->main_try_handle_completed_request());
+
+    REQUIRE(deferred.run_all() == 1);
+    REQUIRE(pContext->main_try_handle_completed_request());
+    REQUIRE(reported == http::error::network_error);
+}
+
+TEST_CASE("a context destroyed mid-transfer cancels it rather than waiting it out", "[jfc::http::context]") {
+    http::test::test_server server({{"200 OK", {}, "late", 10000}});
+
+    REQUIRE(server.listening());
+
+    std::vector<std::thread> threads;
+
+    const auto started = std::chrono::steady_clock::now();
+
+    {
+        const auto pContext = curl_context([&threads](std::vector<http::task_type> &&aTasks) {
+            for (auto &task : aTasks) threads.emplace_back(std::move(task));
+        });
+
+        const auto pGet = pContext->make_get(server.url(), {.timeout_milliseconds = 20000},
+            no_op_success, no_op_failure);
+
+        REQUIRE(pGet->try_submit());
+
+        while (server.connections() == 0) std::this_thread::sleep_for(std::chrono::milliseconds(1));
+    }
+
+    const auto elapsed = std::chrono::steady_clock::now() - started;
+
+    for (auto &thread : threads) thread.join();
+
+    REQUIRE(std::chrono::duration_cast<std::chrono::seconds>(elapsed).count() < 5);
 }

@@ -1,9 +1,10 @@
-// © Joseph Cameron - All Rights Reserved
+// © Joseph Cameron - MIT License
 
 #include <jfc/catch.hpp>
 #include <jfc/types.h>
 
 #include "test_include.h"
+#include "test_server.h"
 
 #include <cstddef>
 #include <memory>
@@ -65,8 +66,8 @@ TEST_CASE("the functor overloads and the handler interface agree",
     http::error viaFunctor = http::error::none;
 
     const auto pFunctorGet = pContext->make_get(REFUSED_URL, config(),
-        [](http::response_data_type) {},
-        [&](http::error aError) { viaFunctor = aError; });
+        [](const http::response &) {},
+        [&](const http::failure &aFailure) { viaFunctor = aFailure.error; });
 
     auto pHandler = std::make_unique<recording_handler>();
 
@@ -112,4 +113,83 @@ TEST_CASE("a handler is destroyed with its request", "[jfc::http::response_handl
     }
 
     REQUIRE(liveCount == 0);
+}
+
+TEST_CASE("a request sent again starts its handler afresh", "[jfc::http::response_handler]") {
+    SECTION("**the buffering handler holds the second body alone**")
+    {
+        test_server server({{"200 OK", {}, "first"}, {"200 OK", {}, "second"}});
+
+        REQUIRE(server.listening());
+
+        const auto pContext = curl_context();
+
+        std::string body;
+
+        const auto pGet = pContext->make_get(server.url(), config(),
+            [&](http::response aResponse) { body = to_string(aResponse.data); }, [](const http::failure &) {});
+
+        REQUIRE(pGet->try_submit());
+        REQUIRE(pContext->main_try_handle_completed_request());
+        REQUIRE(body == "first");
+
+        REQUIRE(pGet->try_submit());
+        REQUIRE(pContext->main_try_handle_completed_request());
+        REQUIRE(body == "second");
+    }
+
+    SECTION("**and forgets that the first went over its limit**")
+    {
+        test_server server({{"200 OK", {}, "far too long"}, {"200 OK", {}, "short"}});
+
+        REQUIRE(server.listening());
+
+        const auto pContext = curl_context();
+
+        std::string body;
+        http::error reported = http::error::none;
+
+        const auto pGet = pContext->make_get(server.url(), config(),
+            std::make_unique<http::buffering_response_handler>(
+                [&](http::response aResponse) { body = to_string(aResponse.data); },
+                [&](const http::failure &aFailure) { reported = aFailure.error; },
+                http::buffering_config{.maximum_bytes = 6}));
+
+        REQUIRE(pGet->try_submit());
+        REQUIRE(pContext->main_try_handle_completed_request());
+        REQUIRE(reported == http::error::response_too_large);
+
+        REQUIRE(pGet->try_submit());
+        REQUIRE(pContext->main_try_handle_completed_request());
+        REQUIRE(body == "short");
+    }
+
+    SECTION("**every handler is told each time it is submitted**")
+    {
+        struct submit_counting_handler final : http::response_handler
+        {
+            std::size_t &submits;
+
+            explicit submit_counting_handler(std::size_t &aSubmits) : submits(aSubmits) {}
+
+            void main_on_submit() override { ++submits; }
+            bool worker_on_data(http::response_chunk_type) override { return true; }
+            void main_on_success() override {}
+            void main_on_failure(const http::error) override {}
+        };
+
+        std::size_t submits = 0;
+
+        const auto pContext = curl_context();
+
+        const auto pGet = pContext->make_get(REFUSED_URL, config(), std::make_unique<submit_counting_handler>(submits));
+
+        for (std::size_t i = 0; i < 3; ++i)
+        {
+            REQUIRE(pGet->try_submit());
+            REQUIRE(pContext->main_try_handle_completed_request());
+        }
+
+        REQUIRE(submits == 3);
+    }
 }

@@ -1,4 +1,4 @@
-// © Joseph Cameron - All Rights Reserved
+// © Joseph Cameron - MIT License
 
 #include <jfc/catch.hpp>
 #include <jfc/types.h>
@@ -36,8 +36,8 @@ TEST_CASE("a refused connection travels the whole path and reports a failure",
     bool succeeded = false;
 
     const auto pGet = pContext->make_get(REFUSED_URL, config(),
-        [&](http::response_data_type) { succeeded = true; },
-        [&](http::error aError) { reported = aError; });
+        [&](const http::response &) { succeeded = true; },
+        [&](const http::failure &aFailure) { reported = aFailure.error; });
 
     REQUIRE(pGet->try_submit());
     REQUIRE(pContext->outstanding_request_count() == 1);
@@ -61,8 +61,8 @@ TEST_CASE("a handled request can be sent again", "[jfc::http::curl_request]") {
     std::size_t failures = 0;
 
     const auto pGet = pContext->make_get(REFUSED_URL, config(),
-        [](http::response_data_type) {},
-        [&](http::error) { ++failures; });
+        [](const http::response &) {},
+        [&](const http::failure &) { ++failures; });
 
     for (std::size_t i = 0; i < 2; ++i)
     {
@@ -106,8 +106,8 @@ TEST_CASE("a post with a body travels the whole path", "[jfc::http::curl_post]")
     http::error reported = http::error::none;
 
     const auto pPost = pContext->make_post(REFUSED_URL, "field=value", config(),
-        [](http::response_data_type) {},
-        [&](http::error aError) { reported = aError; });
+        [](const http::response &) {},
+        [&](const http::failure &aFailure) { reported = aFailure.error; });
 
     REQUIRE(pPost->try_submit());
     REQUIRE(pContext->main_try_handle_completed_request());

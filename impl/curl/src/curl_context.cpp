@@ -1,4 +1,4 @@
-// © Joseph Cameron - All Rights Reserved
+// © Joseph Cameron - MIT License
 
 #include <jfc/http/curl_context.h>
 #include <jfc/http/curl_get.h>
@@ -6,18 +6,13 @@
 #include <jfc/http/curl_request.h>
 #include <jfc/http/curl_share.h>
 
+#include <atomic>
 #include <cstddef>
-#include <mutex>
-#include <thread>
+#include <memory>
 #include <utility>
 #include <vector>
 
 using namespace jfc;
-
-namespace {
-    std::mutex g_GlobalInitMutex;
-    std::size_t g_ContextInstanceCount = 0;
-}
 
 http::context_shared_ptr_type http::curl_context::make(http::policy aPolicy) {
     return http::context_shared_ptr_type(new http::curl_context(std::move(aPolicy)));
@@ -31,18 +26,15 @@ http::curl_context::curl_context(http::policy aPolicy)
 
         return std::move(aPolicy);
     }())
-{
-    const std::lock_guard<std::mutex> lock(g_GlobalInitMutex);
-
-    if (g_ContextInstanceCount++ == 0) curl_global_init(CURL_GLOBAL_ALL);
-}
+{}
 
 http::curl_context::~curl_context() {
-    while (m_InFlightTaskCount.load(std::memory_order_acquire) > 0) std::this_thread::yield();
+    cancel_all();
 
-    const std::lock_guard<std::mutex> lock(g_GlobalInitMutex);
+    auto &inFlight = *m_pInFlightTaskCount;
 
-    if (--g_ContextInstanceCount == 0) curl_global_cleanup();
+    for (auto count = inFlight.load(std::memory_order_acquire); count; count = inFlight.load(std::memory_order_acquire))
+        inFlight.wait(count, std::memory_order_acquire);
 }
 
 void http::curl_context::cancel_all() {
@@ -88,18 +80,39 @@ bool http::curl_context::main_try_handle_completed_request() {
 }
 
 void http::curl_context::submit(std::shared_ptr<http::curl_request> aRequest) {
-    m_UnhandledRequests.push_back(aRequest);
+    struct task_state final {
+        std::shared_ptr<http::curl_request> request;
+        std::shared_ptr<std::atomic<std::size_t>> in_flight;
+        bool ran = false;
 
-    m_InFlightTaskCount.fetch_add(1, std::memory_order_release);
+        task_state(std::shared_ptr<http::curl_request> aRequest, std::shared_ptr<std::atomic<std::size_t>> aInFlight)
+        : request(std::move(aRequest))
+        , in_flight(std::move(aInFlight))
+        {
+            in_flight->fetch_add(1, std::memory_order_release);
+        }
 
-    const auto pGuard = std::shared_ptr<void>(nullptr, [this](void *) {
-        m_InFlightTaskCount.fetch_sub(1, std::memory_order_release);
-    });
+        task_state(const task_state &) = delete;
+        task_state &operator=(const task_state &) = delete;
+
+        ~task_state() {
+            if (!ran) request->worker_abandon();
+
+            in_flight->fetch_sub(1, std::memory_order_release);
+            in_flight->notify_all();
+        }
+    };
+
+    const auto pState = std::make_shared<task_state>(aRequest, m_pInFlightTaskCount);
+
+    m_UnhandledRequests.push_back(std::move(aRequest));
 
     std::vector<http::task_type> tasks;
 
-    tasks.emplace_back([pRequest = std::move(aRequest), pGuard]() {
-        pRequest->worker_fetch_task();
+    tasks.emplace_back([pState]() {
+        pState->ran = true;
+
+        pState->request->worker_fetch_task();
     });
 
     try {

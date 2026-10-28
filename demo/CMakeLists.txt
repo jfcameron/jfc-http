@@ -1,15 +1,11 @@
-# © Joseph Cameron - All Rights Reserved
-
-if(CMAKE_SYSTEM_NAME MATCHES "Linux")
-    find_package(Threads REQUIRED)
-endif()
+# © Joseph Cameron - MIT License
 
 project(jfchttp-demo)
 
 add_executable(jfchttp-demo
     ${CMAKE_CURRENT_SOURCE_DIR}/main.cpp)
 
-target_link_libraries(jfchttp-demo PRIVATE jfchttp ${CMAKE_THREAD_LIBS_INIT})
+target_link_libraries(jfchttp-demo PRIVATE jfchttp)
 
 target_compile_features(jfchttp-demo PRIVATE cxx_std_20)
 

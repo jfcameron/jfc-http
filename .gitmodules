@@ -4,3 +4,6 @@
 [submodule "extern/curl"]
 	path = extern/curl
 	url = https://github.com/jfcameron/curl.git
+[submodule "extern/mbedtls"]
+	path = extern/mbedtls
+	url = https://github.com/Mbed-TLS/mbedtls.git

@@ -1,4 +1,4 @@
-// © Joseph Cameron - All Rights Reserved
+// © Joseph Cameron - MIT License
 
 #include <jfc/catch.hpp>
 #include <jfc/types.h>
@@ -6,6 +6,7 @@
 #include "test_include.h"
 #include "test_server.h"
 
+#include <algorithm>
 #include <atomic>
 #include <chrono>
 #include <cstddef>
@@ -166,8 +167,8 @@ TEST_CASE("cancelling is reported as its own outcome", "[jfc::http::request]") {
     http::error reported = http::error::none;
 
     const auto pGet = pContext->make_get(server.url(), server_config(),
-        [](http::response_data_type) {},
-        [&](http::error aError) { reported = aError; });
+        [](const http::response &) {},
+        [&](const http::failure &aFailure) { reported = aFailure.error; });
 
     REQUIRE(pGet->try_submit());
 
@@ -196,8 +197,8 @@ TEST_CASE("a cancelled request can be sent again", "[jfc::http::request]") {
     http::error reported = http::error::none;
 
     const auto pGet = pContext->make_get(server.url(), server_config(),
-        [&](http::response_data_type aData) { body = to_string(aData); },
-        [&](http::error aError) { reported = aError; });
+        [&](http::response aResponse) { body = to_string(aResponse.data); },
+        [&](const http::failure &aFailure) { reported = aFailure.error; });
 
     REQUIRE(pGet->try_submit());
 
@@ -228,7 +229,7 @@ TEST_CASE("cancel_all stops everything outstanding", "[jfc::http::context]") {
 
     std::vector<std::thread> threads;
 
-    std::atomic<std::size_t> cancellations{0};
+    std::vector<std::string> outcomes;
 
     const auto started = std::chrono::steady_clock::now();
 
@@ -244,10 +245,10 @@ TEST_CASE("cancel_all stops everything outstanding", "[jfc::http::context]") {
         for (std::size_t i = 0; i < 3; ++i)
         {
             requests.push_back(pContext->make_get(server.url(), server_config(),
-                [](http::response_data_type) {},
-                [&cancellations](http::error aError)
+                [&outcomes](const http::response &) { outcomes.push_back("succeeded"); },
+                [&outcomes](const http::failure &aFailure)
                 {
-                    if (aError == http::error::cancelled) ++cancellations;
+                    outcomes.push_back("error " + std::to_string(static_cast<int>(aFailure.error)));
                 }));
         }
 
@@ -271,7 +272,14 @@ TEST_CASE("cancel_all stops everything outstanding", "[jfc::http::context]") {
 
     const auto elapsed = std::chrono::steady_clock::now() - started;
 
-    REQUIRE(cancellations.load() == 3);
+    std::string reported;
+
+    for (const auto &outcome : outcomes) reported += outcome + "; ";
+
+    INFO("outcomes: " << reported);
+
+    REQUIRE(std::count(outcomes.begin(), outcomes.end(),
+        "error " + std::to_string(static_cast<int>(http::error::cancelled))) == 3);
 
     REQUIRE(std::chrono::duration_cast<std::chrono::seconds>(elapsed).count() < 6);
 }
@@ -280,7 +288,7 @@ TEST_CASE("the null implementation accepts a cancel", "[jfc::http::null_context]
     const auto pContext = null_context();
 
     const auto pGet = pContext->make_get(REFUSED_URL, config(),
-        [](http::response_data_type) {}, [](http::error) {});
+        [](const http::response &) {}, [](const http::failure &) {});
 
     REQUIRE_NOTHROW(pGet->cancel());
     REQUIRE_NOTHROW(pContext->cancel_all());

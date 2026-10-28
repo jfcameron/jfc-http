@@ -1,4 +1,4 @@
-// © Joseph Cameron - All Rights Reserved
+// © Joseph Cameron - MIT License
 
 #include <jfc/http.h>
 
@@ -36,13 +36,13 @@ int main(int, char **)
                 .timeout_milliseconds = 300000,
                 .headers = {"Connection: close"},
             },
-            [](http::response_data_type aData) // response handler
+            [](http::response aResponse) // response handler
             {
-                const std::string response(aData.begin(), aData.end());
+                const std::string response(aResponse.data.begin(), aResponse.data.end());
 
                 std::cout << "get response: " << response << "\n";
             },
-            [](http::error) // failure handler
+            [](const http::failure &) // failure handler
             {
                 std::cout << "get failed\n";
             });

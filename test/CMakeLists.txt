@@ -1,8 +1,4 @@
-# © Joseph Cameron - All Rights Reserved
-
-if(CMAKE_SYSTEM_NAME MATCHES "Linux")
-    find_package(Threads REQUIRED)
-endif()
+# © Joseph Cameron - MIT License
 
 if (EMSCRIPTEN)
     set(_jfc_http_test_sources
@@ -28,7 +24,7 @@ else()
 
     set(_jfc_http_test_includes
         "${CMAKE_CURRENT_LIST_DIR}/../impl/curl/include"
-        "${CURL_INCLUDE_DIR}")
+        "${CMAKE_CURRENT_LIST_DIR}/../impl/curl/src/include")
 endif()
 
 jfc_add_tests(
@@ -44,7 +40,6 @@ jfc_add_tests(
 
     LIBRARIES
         jfchttp
-        ${CMAKE_THREAD_LIBS_INIT}
 
     DEPENDENCIES
         "jfchttp"
@@ -52,3 +47,18 @@ jfc_add_tests(
 
 set_property(TARGET ${JFC_TEST_TARGET} PROPERTY CXX_EXTENSIONS OFF)
 
+
+if (NOT CMAKE_CROSSCOMPILING)
+    add_test(NAME jfchttp_install_and_consume
+        COMMAND "${CMAKE_COMMAND}"
+            "-DBUILD_DIR=${PROJECT_BINARY_DIR}"
+            "-DWORK_DIR=${CMAKE_CURRENT_BINARY_DIR}/install_and_consume"
+            "-DCONFIG=$<CONFIG>"
+            "-DGENERATOR=${CMAKE_GENERATOR}"
+            "-DPLATFORM=${CMAKE_GENERATOR_PLATFORM}"
+            "-DTOOLSET=${CMAKE_GENERATOR_TOOLSET}"
+            "-DCXX_COMPILER=${CMAKE_CXX_COMPILER}"
+            "-DCXX_FLAGS=${CMAKE_CXX_FLAGS}"
+            "-DEXE_LINKER_FLAGS=${CMAKE_EXE_LINKER_FLAGS}"
+            -P "${CMAKE_CURRENT_LIST_DIR}/install/install_and_consume.cmake")
+endif()

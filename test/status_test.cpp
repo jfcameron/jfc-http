@@ -1,4 +1,4 @@
-// © Joseph Cameron - All Rights Reserved
+// © Joseph Cameron - MIT License
 
 #include <jfc/catch.hpp>
 #include <jfc/types.h>
@@ -179,8 +179,8 @@ TEST_CASE("a server that ignores a range is caught", "[jfc::http::request_config
     config.resume_from_byte = 8;
 
     const auto pGet = pContext->make_get(server.url(), config,
-        [](http::response_data_type) {},
-        [&](http::error aError) { reported = aError; });
+        [](const http::response &) {},
+        [&](const http::failure &aFailure) { reported = aFailure.error; });
 
     REQUIRE(pGet->try_submit());
     REQUIRE(pContext->main_try_handle_completed_request());
@@ -199,8 +199,8 @@ TEST_CASE("the buffering handler exposes the status it saw",
     http::error reported = http::error::none;
 
     auto pHandler = std::make_unique<http::buffering_response_handler>(
-        [](http::response_data_type) {},
-        [&](http::error aError) { reported = aError; });
+        [](const http::response &) {},
+        [&](const http::failure &aFailure) { reported = aFailure.error; });
 
     auto &handler = *pHandler;
 
@@ -224,4 +224,131 @@ TEST_CASE("reporting a status without a handle does nothing", "[jfc::http::curl_
 
     REQUIRE_FALSE(handler.status.has_value());
     REQUIRE_FALSE(sink.status_reported);
+}
+
+TEST_CASE("the failure functor is told the status beside the error", "[jfc::http::context]") {
+    const auto fail_against = [](test_server &aServer, const http::buffering_config &aBuffering) {
+        const auto pContext = curl_context();
+
+        http::failure reported;
+
+        const auto pGet = pContext->make_get(aServer.url(), server_config(),
+            std::make_unique<http::buffering_response_handler>(
+                [](const http::response &) {},
+                [&](const http::failure &aFailure) { reported = aFailure; },
+                aBuffering));
+
+        REQUIRE(pGet->try_submit());
+        REQUIRE(pContext->main_try_handle_completed_request());
+
+        return reported;
+    };
+
+    SECTION("**a 503 and a 404 are told apart**")
+    {
+        test_server unavailable("503 Service Unavailable", "later");
+        test_server missing("404 Not Found", "gone");
+
+        REQUIRE(unavailable.listening());
+        REQUIRE(missing.listening());
+
+        const auto first = fail_against(unavailable, {});
+        const auto second = fail_against(missing, {});
+
+        REQUIRE(first.error == http::error::http_error);
+        REQUIRE(first.status == 503);
+
+        REQUIRE(second.error == http::error::http_error);
+        REQUIRE(second.status == 404);
+    }
+
+    SECTION("**a body over the limit keeps the status it came with**")
+    {
+        test_server server("200 OK", "far too long");
+
+        REQUIRE(server.listening());
+
+        const auto reported = fail_against(server, {.maximum_bytes = 4});
+
+        REQUIRE(reported.error == http::error::response_too_large);
+        REQUIRE(reported.status == 200);
+    }
+
+    SECTION("**a server never reached gives no status**")
+    {
+        const auto pContext = curl_context();
+
+        http::failure reported;
+
+        const auto pGet = pContext->make_get(REFUSED_URL, config(),
+            [](const http::response &) {},
+            [&](const http::failure &aFailure) { reported = aFailure; });
+
+        REQUIRE(pGet->try_submit());
+        REQUIRE(pContext->main_try_handle_completed_request());
+
+        REQUIRE(reported.error == http::error::network_error);
+        REQUIRE_FALSE(reported.status.has_value());
+    }
+}
+
+TEST_CASE("the success functor is told the status beside the body", "[jfc::http::context]") {
+    const auto succeed_against = [](test_server &aServer, const http::request_config &aConfig) {
+        const auto pContext = curl_context();
+
+        http::response delivered;
+
+        const auto pGet = pContext->make_get(aServer.url(), aConfig,
+            [&](http::response aResponse) { delivered = std::move(aResponse); },
+            [](const http::failure &) {});
+
+        REQUIRE(pGet->try_submit());
+        REQUIRE(pContext->main_try_handle_completed_request());
+
+        return delivered;
+    };
+
+    SECTION("**a 200**")
+    {
+        test_server server("200 OK", "hello");
+
+        REQUIRE(server.listening());
+
+        const auto delivered = succeed_against(server, server_config());
+
+        REQUIRE(delivered.status == 200);
+        REQUIRE(to_string(delivered.data) == "hello");
+    }
+
+    SECTION("**a 404 with fail_on_http_error off, which is a success that says so**")
+    {
+        test_server server("404 Not Found", "no such thing");
+
+        REQUIRE(server.listening());
+
+        auto config = server_config();
+
+        config.fail_on_http_error = false;
+
+        const auto delivered = succeed_against(server, config);
+
+        REQUIRE(delivered.status == 404);
+        REQUIRE(to_string(delivered.data) == "no such thing");
+    }
+
+    SECTION("**a resumed transfer's 206**")
+    {
+        test_server server({{"206 Partial Content", {"Content-Range: bytes 6-9/10"}, "6789"}});
+
+        REQUIRE(server.listening());
+
+        auto config = server_config();
+
+        config.resume_from_byte = 6;
+
+        const auto delivered = succeed_against(server, config);
+
+        REQUIRE(delivered.status == 206);
+        REQUIRE(to_string(delivered.data) == "6789");
+    }
 }

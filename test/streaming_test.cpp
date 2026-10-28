@@ -1,4 +1,4 @@
-// © Joseph Cameron - All Rights Reserved
+// © Joseph Cameron - MIT License
 
 #include <jfc/catch.hpp>
 #include <jfc/types.h>
@@ -195,14 +195,14 @@ TEST_CASE("the buffering handler collects a body through the public interface",
 
     bool succeeded = false;
 
-    const auto on_success = [&](http::response_data_type aData)
+    const auto on_success = [&](http::response aResponse)
     {
-        delivered = std::move(aData);
+        delivered = std::move(aResponse.data);
 
         succeeded = true;
     };
 
-    const auto on_failure = [&](http::error aError) { reported = aError; };
+    const auto on_failure = [&](const http::failure &aFailure) { reported = aFailure.error; };
 
     SECTION("**it assembles the chunks and hands over one body**")
     {
@@ -298,8 +298,8 @@ TEST_CASE("a resumed request is configured with its offset", "[jfc::http::reques
 
     const auto pGet = pContext->make_get(REFUSED_URL,
         {.timeout_milliseconds = 1000, .resume_from_byte = 4096},
-        [](http::response_data_type) {},
-        [&](http::error aError) { reported = aError; });
+        [](const http::response &) {},
+        [&](const http::failure &aFailure) { reported = aFailure.error; });
 
     REQUIRE(pGet->try_submit());
     REQUIRE(pContext->main_try_handle_completed_request());
@@ -326,8 +326,8 @@ TEST_CASE("timeouts can be configured for a large body", "[jfc::http::request_co
             .connect_timeout_milliseconds = 1000,
             .stall_timeout_milliseconds = 2000,
         },
-        [](http::response_data_type) {},
-        [&](http::error aError) { reported = aError; });
+        [](const http::response &) {},
+        [&](const http::failure &aFailure) { reported = aFailure.error; });
 
     REQUIRE(pGet->try_submit());
     REQUIRE(pContext->main_try_handle_completed_request());

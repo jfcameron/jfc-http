@@ -1,4 +1,4 @@
-// © Joseph Cameron - All Rights Reserved
+// © Joseph Cameron - MIT License
 
 #ifndef JFC_HTTP_TYPES_H
 #define JFC_HTTP_TYPES_H
@@ -55,9 +55,21 @@ namespace jfc::http
         unhandled_error //!< used when no other information is available
     };
 
-    using response_functor_type = std::function<void(response_data_type)>;
+    /// \brief why a request failed and the status the server sent if it answered
+    struct failure final {
+        http::error error = http::error::unhandled_error;
+        std::optional<response_status_type> status = std::nullopt;
+    };
 
-    using failure_functor_type = std::function<void(error)>;
+    /// \brief what a request that succeeded delivers: the status the server sent and the body
+    struct response final {
+        response_status_type status = 0;
+        response_data_type data;
+    };
+
+    using response_functor_type = std::function<void(response)>;
+
+    using failure_functor_type = std::function<void(const failure &)>;
 
     using task_type = std::function<void()>;
 

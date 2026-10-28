@@ -1,4 +1,4 @@
-// © Joseph Cameron - All Rights Reserved
+// © Joseph Cameron - MIT License
 
 #include <jfc/http/impl_fetch_request.h>
 
@@ -83,6 +83,8 @@ bool http::fetch_request::try_submit() {
     m_RequestError = http::error::none;
     m_Status = 0;
 
+    m_ResponseHandler->main_on_submit();
+
     emscripten_fetch_attr_t attributes;
     emscripten_fetch_attr_init(&attributes);
 
@@ -140,7 +142,7 @@ void http::fetch_request::on_success(emscripten_fetch_t *const apFetch) {
 
     const auto pRequest = *_holder_of(apFetch);
 
-    pRequest->worker_finish(apFetch, true);
+    pRequest->main_finish(apFetch, true);
 }
 
 void http::fetch_request::on_error(emscripten_fetch_t *const apFetch) {
@@ -148,24 +150,55 @@ void http::fetch_request::on_error(emscripten_fetch_t *const apFetch) {
 
     const auto pRequest = *_holder_of(apFetch);
 
-    pRequest->worker_finish(apFetch, false);
+    pRequest->main_finish(apFetch, false);
 }
 
-void http::fetch_request::worker_finish(emscripten_fetch_t *const apFetch, const bool aSucceeded) {
+void http::fetch_request::main_finish(emscripten_fetch_t *const apFetch, const bool aSucceeded) {
     const auto pContext = m_pContext.lock();
 
     const auto pSelf = shared_from_this();
 
+    const http::response_status_type status = apFetch->status;
+
     std::string headers;
 
-    if (!is_cancelled()) {
+    http::response_data_type body;
+
+    if (pContext && !is_cancelled()) {
         headers.resize(emscripten_fetch_get_response_headers_length(apFetch) + 1, '\0');
 
         emscripten_fetch_get_response_headers(apFetch, headers.data(), headers.size());
+
+        body.assign(apFetch->data, apFetch->data + apFetch->numBytes);
     }
 
-    const auto task = [pSelf, apFetch, aSucceeded, headers = std::move(headers)]() {
-        auto &self = *pSelf;
+    close_fetch();
+
+    if (!pContext) return;
+
+    struct task_state final {
+        std::shared_ptr<http::fetch_request> request;
+        bool ran = false;
+
+        explicit task_state(std::shared_ptr<http::fetch_request> aRequest) : request(std::move(aRequest)) {}
+
+        task_state(const task_state &) = delete;
+        task_state &operator=(const task_state &) = delete;
+
+        ~task_state() {
+            if (ran) return;
+
+            request->m_RequestError = http::error::cancelled;
+            request->m_bResponseLocked.clear();
+        }
+    };
+
+    const auto pState = std::make_shared<task_state>(pSelf);
+
+    const auto task = [pState, status, aSucceeded, headers = std::move(headers), body = std::move(body)]() {
+        pState->ran = true;
+
+        auto &self = *pState->request;
 
         if (self.is_cancelled()) {
             self.m_RequestError = http::error::cancelled;
@@ -174,7 +207,7 @@ void http::fetch_request::worker_finish(emscripten_fetch_t *const apFetch, const
             return;
         }
 
-        self.m_Status = apFetch->status;
+        self.m_Status = status;
 
         try {
             if (self.m_Status) self.m_ResponseHandler->worker_on_status(self.m_Status);
@@ -201,8 +234,6 @@ void http::fetch_request::worker_finish(emscripten_fetch_t *const apFetch, const
                 self.m_RequestError = http::error::range_not_satisfied;
             }
             else {
-                const http::response_chunk_type body(apFetch->data, static_cast<std::size_t>(apFetch->numBytes));
-
                 if (!body.empty() && !self.m_ResponseHandler->worker_on_data(body))
                     self.m_RequestError = http::error::aborted_by_handler;
                 else
@@ -220,8 +251,12 @@ void http::fetch_request::worker_finish(emscripten_fetch_t *const apFetch, const
         self.m_bResponseLocked.clear();
     };
 
-    if (pContext) pContext->run_worker_half(task);
-    else task();
+    try {
+        pContext->run_worker_half(task);
+    }
+    catch (...) {
+        m_HandlerException = std::current_exception();
+    }
 }
 
 bool http::fetch_request::main_try_claim() {
@@ -235,6 +270,12 @@ void http::fetch_request::main_abort_if_cancelled() {
 
     m_RequestError = http::error::cancelled;
     m_bResponseLocked.clear();
+}
+
+void http::fetch_request::main_abandon() {
+    cancel();
+
+    close_fetch();
 }
 
 void http::fetch_request::close_fetch() {

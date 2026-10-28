@@ -1,4 +1,4 @@
-// © Joseph Cameron - All Rights Reserved
+// © Joseph Cameron - MIT License
 
 #ifndef JFC_HTTP_IMPL_FETCH_REQUEST_H
 #define JFC_HTTP_IMPL_FETCH_REQUEST_H
@@ -35,6 +35,8 @@ namespace jfc::http {
 
         void main_abort_if_cancelled();
 
+        void main_abandon();
+
         virtual ~fetch_request();
 
     protected:
@@ -52,7 +54,7 @@ namespace jfc::http {
 
         static void on_progress(emscripten_fetch_t *apFetch);
 
-        void worker_finish(emscripten_fetch_t *apFetch, const bool aSucceeded);
+        void main_finish(emscripten_fetch_t *apFetch, const bool aSucceeded);
 
         void close_fetch();
 

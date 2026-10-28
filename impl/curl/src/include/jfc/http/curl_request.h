@@ -1,4 +1,4 @@
-// © Joseph Cameron - All Rights Reserved
+// © Joseph Cameron - MIT License
 
 #ifndef JFC_HTTP_CURL_REQUEST_H
 #define JFC_HTTP_CURL_REQUEST_H
@@ -15,7 +15,6 @@
 #include <memory>
 #include <string>
 
-#define CURL_STATICLIB
 #include <curl/curl.h>
 
 namespace jfc::http {
@@ -72,6 +71,9 @@ namespace jfc::http {
         /// \brief fetch task run by worker threads
         void worker_fetch_task() noexcept;
 
+        /// \brief finish as cancelled a request whose task was destroyed without running
+        void worker_abandon() noexcept;
+
         /// \brief claim this request for handling
         [[nodiscard]] bool main_try_claim();
 
@@ -102,6 +104,8 @@ namespace jfc::http {
         using curl_handle_ptr_type = std::shared_ptr<CURL>;
 
         using curl_linked_list_ptr_type = std::shared_ptr<curl_slist>;
+
+        const http::curl_global m_Global;
 
         std::weak_ptr<http::curl_context> m_pContext;
 

@@ -1,4 +1,4 @@
-// © Joseph Cameron - All Rights Reserved
+// © Joseph Cameron - MIT License
 
 #include <jfc/http/buffering_response_handler.h>
 
@@ -13,6 +13,12 @@ http::buffering_response_handler::buffering_response_handler(http::response_func
 , m_FailureFunctor(std::move(aOnFailure))
 , m_MaximumBytes(aConfig.maximum_bytes)
 {}
+
+void http::buffering_response_handler::main_on_submit() {
+    m_Buffer.clear();
+    m_Status.reset();
+    m_bExceededLimit = false;
+}
 
 void http::buffering_response_handler::worker_on_status(const http::response_status_type aStatus) {
     m_Status = aStatus;
@@ -30,11 +36,11 @@ bool http::buffering_response_handler::worker_on_data(http::response_chunk_type 
 }
 
 void http::buffering_response_handler::main_on_success() {
-    m_SuccessFunctor(m_Buffer);
+    m_SuccessFunctor({.status = m_Status.value_or(0), .data = m_Buffer});
 }
 
 void http::buffering_response_handler::main_on_failure(const http::error aError) {
-    m_FailureFunctor(m_bExceededLimit ? http::error::response_too_large : aError);
+    m_FailureFunctor({.error = m_bExceededLimit ? http::error::response_too_large : aError, .status = m_Status});
 }
 
 const http::response_data_type &http::buffering_response_handler::response() const {

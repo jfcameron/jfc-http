@@ -1,4 +1,4 @@
-// © Joseph Cameron - All Rights Reserved
+// © Joseph Cameron - MIT License
 
 #include <jfc/catch.hpp>
 #include <jfc/types.h>
@@ -105,8 +105,8 @@ TEST_CASE("a real pool performs the fetches while main drains completions",
     for (std::size_t i = 0; i < REQUEST_COUNT; ++i)
     {
         requests.push_back(pContext->make_get(REFUSED_URL, config(),
-            [](http::response_data_type) {},
-            [&failures](http::error) { ++failures; }));
+            [](const http::response &) {},
+            [&failures](const http::failure &) { ++failures; }));
     }
 
     for (const auto &pRequest : requests) REQUIRE(pRequest->try_submit());
@@ -143,8 +143,8 @@ TEST_CASE("two contexts can share one pool", "[jfc::http::context]") {
         for (std::size_t i = 0; i < REQUESTS_EACH; ++i)
         {
             requests.push_back(pContext->make_get(REFUSED_URL, config(),
-                [](http::response_data_type) {},
-                [&failures](http::error) { ++failures; }));
+                [](const http::response &) {},
+                [&failures](const http::failure &) { ++failures; }));
         }
     }
 

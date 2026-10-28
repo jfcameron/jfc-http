@@ -1,4 +1,4 @@
-// © Joseph Cameron - All Rights Reserved
+// © Joseph Cameron - MIT License
 
 #include <jfc/catch.hpp>
 #include <jfc/types.h>
@@ -26,8 +26,8 @@ namespace {
         std::string body;
 
         const auto pGet = aContext->make_get(aURL, server_config(),
-            [&](http::response_data_type aData) { body = to_string(aData); },
-            [](http::error) {});
+            [&](http::response aResponse) { body = to_string(aResponse.data); },
+            [](const http::failure &) {});
 
         REQUIRE(pGet->try_submit());
         REQUIRE(aContext->main_try_handle_completed_request());
@@ -104,7 +104,7 @@ TEST_CASE("a request destroyed after its context cleans up safely", "[jfc::http:
         REQUIRE(fetch(pContext, server.url()) == "body");
 
         pOutlivingRequest = pContext->make_get(server.url(), server_config(),
-            [](http::response_data_type) {}, [](http::error) {});
+            [](const http::response &) {}, [](const http::failure &) {});
     }
 
     REQUIRE(pOutlivingRequest);

@@ -1,4 +1,4 @@
-// © Joseph Cameron - All Rights Reserved
+// © Joseph Cameron - MIT License
 
 #ifndef JFC_HTTP_FETCH_CONTEXT_H
 #define JFC_HTTP_FETCH_CONTEXT_H
@@ -56,7 +56,7 @@ namespace jfc::http
         void run_worker_half(http::task_type &&aTask);
     ///@}
 
-        ~fetch_context() override = default;
+        ~fetch_context() override;
 
     private:
         explicit fetch_context(http::policy aPolicy);

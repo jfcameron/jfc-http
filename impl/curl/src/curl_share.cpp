@@ -1,12 +1,29 @@
-// © Joseph Cameron - All Rights Reserved
+// © Joseph Cameron - MIT License
 
 #include <jfc/http/curl_share.h>
 
 #include <jfc/http/exception.h>
 
 #include <cstddef>
+#include <mutex>
 
 using namespace jfc;
+
+namespace {
+    std::mutex g_GlobalMutex;
+}
+
+http::curl_global::curl_global() {
+    const std::lock_guard<std::mutex> lock(g_GlobalMutex);
+
+    if (curl_global_init(CURL_GLOBAL_ALL) != CURLE_OK) throw http::exception("jfc::http: could not initialize libcurl");
+}
+
+http::curl_global::~curl_global() {
+    const std::lock_guard<std::mutex> lock(g_GlobalMutex);
+
+    curl_global_cleanup();
+}
 
 void http::curl_share::lock(CURL *, const curl_lock_data aData, curl_lock_access, void *apUser) {
     static_cast<http::curl_share *>(apUser)->m_Mutexes[static_cast<std::size_t>(aData)].lock();
