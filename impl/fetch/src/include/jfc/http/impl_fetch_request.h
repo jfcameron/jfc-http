@@ -12,6 +12,7 @@
 #include <emscripten/fetch.h>
 
 #include <atomic>
+#include <chrono>
 #include <cstddef>
 #include <exception>
 #include <memory>
@@ -83,6 +84,8 @@ namespace jfc::http {
         std::exception_ptr m_HandlerException;
 
         http::response_status_type m_Status = 0;
+
+        std::chrono::steady_clock::time_point m_Submitted;
     };
 
     class fetch_get final : public http::request, public http::fetch_request {

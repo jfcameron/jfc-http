@@ -38,8 +38,10 @@ namespace {
 
             case CURLE_COULDNT_RESOLVE_PROXY:
             case CURLE_COULDNT_RESOLVE_HOST:
-            case CURLE_COULDNT_CONNECT:
             case CURLE_OPERATION_TIMEDOUT:
+                return http::error::timed_out;
+
+            case CURLE_COULDNT_CONNECT:
             case CURLE_SSL_CONNECT_ERROR:
             case CURLE_PEER_FAILED_VERIFICATION:
             case CURLE_GOT_NOTHING:

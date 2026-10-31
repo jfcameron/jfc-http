@@ -292,6 +292,25 @@ TEST_CASE("the failure functor is told the status beside the error", "[jfc::http
     }
 }
 
+TEST_CASE("a transfer past its timeout says so, rather than that the network failed", "[jfc::http::context]") {
+    test_server server({{.body = "too late", .body_delay_milliseconds = 1000}});
+
+    REQUIRE(server.listening());
+
+    const auto pContext = curl_context();
+
+    http::error reported = http::error::none;
+
+    const auto pGet = pContext->make_get(server.url(), {.timeout_milliseconds = 100},
+        [](const http::response &) { FAIL("delivered"); },
+        [&](const http::failure &aFailure) { reported = aFailure.error; });
+
+    REQUIRE(pGet->try_submit());
+    REQUIRE(pContext->main_try_handle_completed_request());
+
+    REQUIRE(reported == http::error::timed_out);
+}
+
 TEST_CASE("the success functor is told the status beside the body", "[jfc::http::context]") {
     const auto succeed_against = [](test_server &aServer, const http::request_config &aConfig) {
         const auto pContext = curl_context();

@@ -5,6 +5,7 @@
 #include <jfc/http/exception.h>
 
 #include <algorithm>
+#include <chrono>
 #include <cstring>
 #include <string_view>
 #include <utility>
@@ -100,6 +101,7 @@ bool http::fetch_request::try_submit() {
     attributes.userData = new std::shared_ptr<fetch_request>(shared_from_this());
 
     m_bInFlight = true;
+    m_Submitted = std::chrono::steady_clock::now();
 
     m_pFetch = emscripten_fetch(&attributes, m_URL.c_str());
 
@@ -228,7 +230,15 @@ void http::fetch_request::main_finish(emscripten_fetch_t *const apFetch, const b
             const bool httpError = self.m_Status >= 400;
 
             if (!aSucceeded && (self.m_Status == 0 || (httpError && self.m_Config.fail_on_http_error))) {
-                self.m_RequestError = self.m_Status == 0 ? http::error::network_error : http::error::http_error;
+                // Fetch reports a timeout as it does any other failure, so the time taken is what tells them apart
+                const auto took = std::chrono::duration_cast<std::chrono::milliseconds>(
+                    std::chrono::steady_clock::now() - self.m_Submitted).count();
+                const auto limit = self.m_Config.timeout_milliseconds;
+
+                if (self.m_Status != 0) self.m_RequestError = http::error::http_error;
+                else if (limit > 0 && static_cast<http::milliseconds_type>(took) >= limit)
+                    self.m_RequestError = http::error::timed_out;
+                else self.m_RequestError = http::error::network_error;
             }
             else if (self.m_Config.resume_from_byte > 0 && self.m_Status != 206) {
                 self.m_RequestError = http::error::range_not_satisfied;

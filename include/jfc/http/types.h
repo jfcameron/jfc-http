@@ -45,6 +45,7 @@ namespace jfc::http
         none,
         unsupported_protocol,
         network_error,
+        timed_out, ///< a timeout in \ref request_config ran out before the transfer was done
         cancelled, ///< the caller asked for this request to be abandoned
         handler_threw, ///< a handler threw, and the exception is waiting to be rethrown on the main thread
         aborted_by_handler, ///< the handler stopped the transfer by returning false from `worker_on_data`
