@@ -2,6 +2,7 @@
 
 if (EMSCRIPTEN)
     set(_jfc_http_test_sources
+        "${CMAKE_CURRENT_LIST_DIR}/exception_test.cpp"
         "${CMAKE_CURRENT_LIST_DIR}/fetch_context_test.cpp"
         "${CMAKE_CURRENT_LIST_DIR}/null_context_test.cpp")
 
@@ -12,6 +13,7 @@ else()
         "${CMAKE_CURRENT_LIST_DIR}/context_test.cpp"
         "${CMAKE_CURRENT_LIST_DIR}/curl_request_test.cpp"
         "${CMAKE_CURRENT_LIST_DIR}/dispatch_test.cpp"
+        "${CMAKE_CURRENT_LIST_DIR}/exception_test.cpp"
         "${CMAKE_CURRENT_LIST_DIR}/handler_exception_test.cpp"
         "${CMAKE_CURRENT_LIST_DIR}/headers_test.cpp"
         "${CMAKE_CURRENT_LIST_DIR}/null_context_test.cpp"
