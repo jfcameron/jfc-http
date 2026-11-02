@@ -55,6 +55,21 @@ TEST_CASE("a refused connection travels the whole path and reports a failure",
     }
 }
 
+TEST_CASE("a host that does not resolve is a network failure, not a timeout", "[jfc::http::curl_request]") {
+    const auto pContext = curl_context();
+
+    http::error reported = http::error::none;
+
+    const auto pGet = pContext->make_get("http://jfc-http-test.invalid/", {},
+        [](const http::response &) { FAIL("delivered"); },
+        [&](const http::failure &aFailure) { reported = aFailure.error; });
+
+    REQUIRE(pGet->try_submit());
+    REQUIRE(pContext->main_try_handle_completed_request());
+
+    REQUIRE(reported == http::error::network_error);
+}
+
 TEST_CASE("a handled request can be sent again", "[jfc::http::curl_request]") {
     const auto pContext = curl_context();
 
